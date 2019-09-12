@@ -11,7 +11,6 @@ import logging
 import argparse
 
 import pandas as pd
-import numpy as np
 
 # Set up the logger
 logging.basicConfig(level=logging.INFO, format="[ %(asctime)s UTC ]: %(levelname)s: %(module)s: %(message)s")
