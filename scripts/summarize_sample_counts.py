@@ -80,7 +80,7 @@ def main(args):
     # Get min count and write, if desired
     if min_count_filepath is not False:
         logger.info("Writing min count to " + min_count_filepath)
-        min_count = sample_counts.iat[0,1]
+        min_count = int(sample_counts.iat[0,1])
         with open(min_count_filepath, 'w') as min_count_file:
             min_count_file.write(str(min_count) + '\n')
 
