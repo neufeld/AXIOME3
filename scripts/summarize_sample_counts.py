@@ -74,7 +74,7 @@ def main(args):
     sample_counts = sample_counts.sort_values(by = sample_counts.columns[1])
 
     # Write output
-    logger.info("Writing BIOM file to " + output_filepath)
+    logger.info("Writing counts summary file to " + output_filepath)
     pd.DataFrame.to_csv(sample_counts, output_filepath, sep = '\t', index = False)
 
     # Get min count and write, if desired
