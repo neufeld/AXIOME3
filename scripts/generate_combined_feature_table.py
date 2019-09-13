@@ -189,11 +189,11 @@ if __name__ == '__main__':
                        'You can optionally omit this flag and not have taxonomy added to the table.')
     parser.add_argument('-o', '--output_feature_table', metavar = 'output', required = True, 
                        help = 'The path to the output merged feature table.')
-    parser.add_argument('-N', '--feature_id_colname', metavar = 'output', required = False, default = 'Feature ID', 
+    parser.add_argument('-N', '--feature_id_colname', metavar = 'colname', required = False, default = 'Feature ID', 
                        help = 'The name of the first column of the output ASV table. [Default: "Feature ID"]')
-    parser.add_argument('-S', '--sort_features', metavar = 'output', required = False, action = 'store_true', 
+    parser.add_argument('-S', '--sort_features', metavar = 'sort', required = False, action = 'store_true', 
                        help = 'Optionally sort Feature IDs roughly based on overall abundance.')
-    parser.add_argument('-R', '--rename_features', metavar = 'output', required = False, action = 'store_true', 
+    parser.add_argument('-R', '--rename_features', metavar = 'rename', required = False, action = 'store_true', 
                        help = 'Optionally rename the Feature IDs sequentially, roughly based on overall abundance. '
                        'Automatically sets --sort_features')
     
