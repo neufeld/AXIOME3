@@ -179,21 +179,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Creates a TSV-format QIIME2 feature table with overlaid taxonomy and sequence '
                                                    'information for convenience of viewing. '
                                                    'Copyright Jackson M. Tsuji, Neufeld Research Group, 2019.')
-    parser.add_argument('-f', '--feature_table', metavar = 'table', required = True, 
+    parser.add_argument('-f', '--feature_table', required = True, 
                        help = 'The path to the input TSV feature table file.')
-    parser.add_argument('-s', '--rep_seqs', metavar = 'seqs', required = False, default = False, 
+    parser.add_argument('-s', '--rep_seqs', required = False, default = False, 
                        help = 'The path to the input FastA representative sequences file. Sequences will be added as the '
                        '"ReprSequences" column. You can optionally omit this flag and not have sequences added to the table.')
-    parser.add_argument('-t', '--taxonomy', metavar = 'taxonomy', required = False, default = False, 
+    parser.add_argument('-t', '--taxonomy', required = False, default = False, 
                        help = 'The path to the input taxonomy file. Taxonomy will be added as the "Consensus.Lineage" column. '
                        'You can optionally omit this flag and not have taxonomy added to the table.')
-    parser.add_argument('-o', '--output_feature_table', metavar = 'output', required = True, 
-                       help = 'The path to the output merged feature table.')
-    parser.add_argument('-N', '--feature_id_colname', metavar = 'colname', required = False, default = 'Feature ID', 
+    parser.add_argument('-o', '--output_feature_table', required = True, 
+                       help = 'The path to the output TSV feature table.')
+    parser.add_argument('-N', '--feature_id_colname', required = False, default = 'Feature ID', 
                        help = 'The name of the first column of the output ASV table. [Default: "Feature ID"]')
-    parser.add_argument('-S', '--sort_features', metavar = 'sort', required = False, action = 'store_true', 
+    parser.add_argument('-S', '--sort_features', required = False, action = 'store_true', 
                        help = 'Optionally sort Feature IDs roughly based on overall abundance.')
-    parser.add_argument('-R', '--rename_features', metavar = 'rename', required = False, action = 'store_true', 
+    parser.add_argument('-R', '--rename_features', required = False, action = 'store_true', 
                        help = 'Optionally rename the Feature IDs sequentially, roughly based on overall abundance. '
                        'Automatically sets --sort_features')
     
