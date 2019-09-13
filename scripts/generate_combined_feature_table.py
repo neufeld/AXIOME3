@@ -143,16 +143,8 @@ def main(args):
     logger.info('Loading feature table')
     feature_table = read_feature_table(feature_table_filepath)
     
-    # Sort and/or rename Feature IDs
-    if rename_features is True:
-        # Sort the table
-        feature_table = sort_feature_table(feature_table)
-    
-        # Rename
-        logger.info('Renamng feature IDs sequentially')
-        num_rows = feature_table.shape[0]
-        feature_table['Feature ID'] = range(num_rows)
-    elif sort_features is True:
+    # Sort Feature IDs
+    if rename_features is True || sort_features is True:
         # Sort the table
         feature_table = sort_feature_table(feature_table)
     
@@ -164,8 +156,14 @@ def main(args):
     if rep_seq_filepath is not False:
         add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
 
+	if rename_features is True:
+        # Rename
+        logger.info('Renamng feature IDs sequentially')
+        num_rows = feature_table.shape[0]
+        feature_table['Feature ID'] = range(num_rows)
+
     # Change first column to that desired by user
-    if feature_id_colname is not 'Feature ID':
+    if feature_id_colname != 'Feature ID':
         logger.info('Changing "Feature ID" colname to ' + feature_id_colname)
         feature_table = feature_table.rename(columns = {'Feature ID': feature_id_colname})
 
