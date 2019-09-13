@@ -156,7 +156,7 @@ def main(args):
     if rep_seq_filepath is not False:
         add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
 
-	if rename_features is True:
+    if rename_features is True:
         # Rename
         logger.info('Renamng feature IDs sequentially')
         num_rows = feature_table.shape[0]
