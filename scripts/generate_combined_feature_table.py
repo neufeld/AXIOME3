@@ -144,7 +144,7 @@ def main(args):
     feature_table = read_feature_table(feature_table_filepath)
     
     # Sort Feature IDs
-    if rename_features is True || sort_features is True:
+    if (rename_features is True) or (sort_features is True):
         # Sort the table
         feature_table = sort_feature_table(feature_table)
     
