@@ -135,7 +135,7 @@ def main(args):
     rename_features = args.rename_features
 
     # Set sort_features to True if rename_features is True
-    if rename_feature is True:
+    if rename_features is True:
         sort_features = True
 
     # Startup messages
