@@ -153,11 +153,11 @@ def main(args):
     feature_table = read_feature_table(feature_table_filepath)
     
     # Add taxonomy
-    if math.isnan(taxonomy_filepath) is False:
+    if taxonomy_filepath is not False:
         feature_table = add_taxonomy_to_feature_table(feature_table, taxonomy_filepath)
 
     # Add representative sequences
-    if math.isnan(rep_seq_filepath) is False:
+    if rep_seq_filepath is not False:
         feature_table = add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
 
     # Sort Feature IDs
@@ -187,10 +187,10 @@ if __name__ == '__main__':
                                                    'Copyright Jackson M. Tsuji, Neufeld Research Group, 2019.')
     parser.add_argument('-f', '--feature_table', required = True, 
                        help = 'The path to the input TSV feature table file.')
-    parser.add_argument('-s', '--rep_seqs', required = False, default = 'NaN', 
+    parser.add_argument('-s', '--rep_seqs', required = False, default = False, 
                        help = 'The path to the input FastA representative sequences file. Sequences will be added as the '
                        '"ReprSequences" column. You can optionally omit this flag and not have sequences added to the table.')
-    parser.add_argument('-t', '--taxonomy', required = False, default = 'NaN', 
+    parser.add_argument('-t', '--taxonomy', required = False, default = False, 
                        help = 'The path to the input taxonomy file. Taxonomy will be added as the "Consensus.Lineage" column. '
                        'You can optionally omit this flag and not have taxonomy added to the table.')
     parser.add_argument('-o', '--output_feature_table', required = True, 
