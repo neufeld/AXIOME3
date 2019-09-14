@@ -37,7 +37,7 @@ def read_feature_table(feature_table_filepath):
         if feature_table.columns.values.tolist()[0] == '#OTU ID':
             logger.debug('Renaming first column of feature table ("#OTU ID") to "Feature ID"')
             feature_table = feature_table.rename(columns = {'#OTU ID': 'Feature ID'})
-        else
+        else:
             logger.error('Do not recognize the first column of the feature table as feature IDs. Exiting...')
             sys.exit(1)
             
