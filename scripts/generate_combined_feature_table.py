@@ -37,28 +37,10 @@ def read_feature_table(feature_table_filepath):
         if feature_table.columns.values.tolist()[0] == '#OTU ID':
             logger.debug('Renaming first column of feature table ("#OTU ID") to "Feature ID"')
             feature_table = feature_table.rename(columns = {'#OTU ID': 'Feature ID'})
+        else
+            logger.error('Do not recognize the first column of the feature table as feature IDs. Exiting...')
+            sys.exit(1)
             
-    return(feature_table)
-
-def sort_feature_table(feature_table):
-    """
-    Roughly sorts a QIIME2 feature table by percent abundances of Features
-
-    :param feature_table: QIIME2 FeatureTable[Frequency] artifact loaded as a pandas DataFrame
-    :return: sorted QIIME2 FeatureTable[Frequency] artifact
-    """
-    # Sum rows
-    # NOTE: this still works even if non-sample columns like Consensus.Lineage are there. It ignores non-numeric columns silently
-    features_sum = pd.DataFrame({'Feature ID': feature_table['Feature ID'],
-                                'sum': feature_table.iloc[0: ,1:].sum(axis = 1)})
-                                
-    # Sort
-    features_sum = features_sum.sort_values(by = ['sum'], ascending = False)
-    
-    # The left join seems to automatically handle sorting by the left table
-    logger.info('Sorting feature table')
-    feature_table = pd.merge(features_sum.drop(columns = 'sum'), feature_table, how = 'left', on = 'Feature ID')
-    
     return(feature_table)
 
 def add_taxonomy_to_feature_table(feature_table, taxonomy_filepath):
@@ -120,6 +102,28 @@ def add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath):
     
     return(feature_table)
 
+def sort_feature_table(feature_table):
+    """
+    Roughly sorts a QIIME2 feature table by percent abundances of Features
+
+    :param feature_table: QIIME2 FeatureTable[Frequency] artifact loaded as a pandas DataFrame
+    :return: sorted QIIME2 FeatureTable[Frequency] artifact
+    """
+    # Sum rows
+    # TODO - this still works even if non-sample columns like Consensus.Lineage are there. It ignores non-numeric columns silently.
+    # However, longer-term =, a better method to distinguish samples from metadata should be developed.
+    features_sum = pd.DataFrame({'Feature ID': feature_table['Feature ID'],
+                                'sum': feature_table.iloc[0: ,1:].sum(axis = 1)})
+                                
+    # Sort
+    features_sum = features_sum.sort_values(by = ['sum'], ascending = False)
+    
+    # The left join seems to automatically handle sorting by the left table
+    logger.info('Sorting feature table')
+    feature_table = pd.merge(features_sum.drop(columns = 'sum'), feature_table, how = 'left', on = 'Feature ID')
+    
+    return(feature_table)
+
 def main(args):
     # Set user variables
     feature_table_filepath = args.feature_table
@@ -129,6 +133,10 @@ def main(args):
     feature_id_colname = args.feature_id_colname
     sort_features = args.sort_features
     rename_features = args.rename_features
+
+    # Set sort_features to True if rename_features is True
+    if rename_feature is True:
+        sort_features = True
 
     # Startup messages
     logger.info('Running ' + os.path.basename(sys.argv[0]))
@@ -143,11 +151,6 @@ def main(args):
     logger.info('Loading feature table')
     feature_table = read_feature_table(feature_table_filepath)
     
-    # Sort Feature IDs
-    if (rename_features is True) or (sort_features is True):
-        # Sort the table
-        feature_table = sort_feature_table(feature_table)
-    
     # Add taxonomy
     if taxonomy_filepath is not False:
         add_taxonomy_to_feature_table(feature_table, taxonomy_filepath)
@@ -156,15 +159,19 @@ def main(args):
     if rep_seq_filepath is not False:
         add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
 
+    # Sort Feature IDs
+    if sort_features is True:
+        feature_table = sort_feature_table(feature_table)
+
+    # Rename Feature IDs
     if rename_features is True:
-        # Rename
         logger.info('Renamng feature IDs sequentially')
         num_rows = feature_table.shape[0]
         feature_table['Feature ID'] = range(num_rows)
 
     # Change first column to that desired by user
     if feature_id_colname != 'Feature ID':
-        logger.info('Changing "Feature ID" colname to ' + feature_id_colname)
+        logger.info('Changing "Feature ID" colname to "' + feature_id_colname + '"')
         feature_table = feature_table.rename(columns = {'Feature ID': feature_id_colname})
 
     # Write output
