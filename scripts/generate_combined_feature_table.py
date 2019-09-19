@@ -202,6 +202,8 @@ if __name__ == '__main__':
     parser.add_argument('-R', '--rename_features', required = False, action = 'store_true', 
                        help = 'Optionally rename the Feature IDs sequentially, roughly based on overall abundance. '
                        'Automatically sets --sort_features')
+    # TODO - add optional flag to parse taxonomy into 7 ranks
+    # TODO - add option to auto-detect if a QZA file is provided instead of the unpackaged file. Deal with the converstions. Same for if a BIOM file is provided.
     
     command_line_args = parser.parse_args()
     main(command_line_args)

@@ -45,9 +45,9 @@ elif [[ $1 = "-h" ]] || [[ $1 = "--help" ]]; then
   # Help statement
   printf "${SCRIPT_NAME}: run end-to-end test for generate_combined_feature_table.py\n"
   printf "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019\n\n"
-  printf "Usage: ${SCRIPT_NAME} test_dir\n"
+  printf "Usage: ${SCRIPT_NAME} test_dir\n\n"
   printf "Positional arguments (required):\n"
-  printf "   test_dir: path to the test directory containing the 'inputs' and 'outputs_expected' test folders\n"
+  printf "   test_dir: path to the test directory containing the 'inputs' and 'outputs_expected' test folders\n\n"
   printf "Note: script will give an exit status of 1 if any tests fail; otherwise exit status will be 0.\n\n"
 
   # Exit
