@@ -62,17 +62,17 @@ For example, (I use "vim" text editor)
 
 ###### 2. Go to the end of the file
 
-For vim users, you can press G (uppercase G; it is case-sensitive!) 
+For vim users, press G (uppercase G; it is case-sensitive!) 
 
 ###### 3. Add 'PATH=${PATH}:/Data/reference/databases/qiime2/qiime2-helpers/scripts' to the end of the file
 
-For vim users, do the following steps...
+For vim users, do the following...
 
-...a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
+&nbsp;&nbsp;&nbsp;a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
 
-...b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
+&nbsp;&nbsp;&nbsp;b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
 
-...c) Add the following lines
+&nbsp;&nbsp;&nbsp;c) Add the following lines
 
 ```
 # Temporary PATH variable to access Jackson's script
