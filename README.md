@@ -23,11 +23,13 @@ In this case, you do not necessarily need to install a new virtual environment f
 You should just do...
 
 <br />
+
 ##### 1. activate your qiime environment 
 
 `conda activate <YOUR_QIIME_ENV>`
 
 <br />
+
 ##### 2. Make sure pip and python are pointing to anaconda packages *not to /usr/bin*
 
 `which pip` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip`
@@ -35,16 +37,19 @@ You should just do...
 `which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
 
 <br />
+
 ##### 3. Install luigi by running the command...
 
 `pip install luigi`
 
 <br />
+
 ##### 4. Install BioPython and pandas (Jackson's script depends on these packages)
 
 `conda install -c bioconda biopython pandas`
 
 <br />
+
 ##### 5. Add PATH variable (so that you can access Jackson's script on the server)
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
@@ -63,7 +68,6 @@ For vim users, you can press G (uppercase G; it is case-sensitive!)
 
 For vim users, do the following steps...
 
-<br />
 ...a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
 
 ...b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
