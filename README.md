@@ -30,27 +30,19 @@ You should just do...
 
 `conda activate <YOUR_QIIME_ENV>`
 
-<br />
-
 ##### 2. Make sure pip and python are pointing to anaconda packages *not to /usr/bin*
 
 `which pip` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip`
 
 `which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
 
-<br />
-
 ##### 3. Install luigi by running the command...
 
 `pip install luigi`
 
-<br />
-
 ##### 4. Install BioPython and pandas (Jackson's script depends on these packages)
 
 `conda install -c bioconda biopython pandas`
-
-<br />
 
 ##### 5. Add PATH variable (so that you can access Jackson's script on the server)
 
@@ -101,7 +93,7 @@ In this case, you can install conda environment directly from .yml file in this 
 
 `conda env create --name <ENV_NAME> --file conda_env_file/16S-luigi.yml`
 
-Then, add PATH=${PATH}:/Data/reference/databases/qiime2/qiime2-helpers/scripts to your .bashrc file
+Then, add PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts to your .bashrc file
 
 ## Usage
 
@@ -151,4 +143,4 @@ python 16S_pipeline.py Production_Mode --local-scheduler
 
 5. This will create the output directory that contains all your outputs. Make sure to move/clean up this directory after your done
 
-*luigi may not run if this directory is not properly cleaned up*
+_luigi may not run if this directory is not properly cleaned up_
