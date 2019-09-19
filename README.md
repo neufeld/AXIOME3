@@ -1,4 +1,4 @@
-# Neufeld-16S-Pipeline
+# Neufeld lab 16S RNA analysis pipeline
 
 ## About
 16S RNA analysis workflow based on qiime2 wrapped in luigi framework

@@ -14,7 +14,7 @@ taxonomy_dir = os.path.join(out_dir, "taxonomy")
 export_dir = os.path.join(out_dir, "exported")
 
 # Path to configuration file to be used
-luigi.configuration.add_config_path("luigi.cfg")
+luigi.configuration.add_config_path("configuration/luigi.cfg")
 
 def run_cmd(cmd, step):
     try:
@@ -462,7 +462,6 @@ class Production_Mode(luigi.Task):
                 Convert_Biom_to_TSV(),
                 Generate_Combined_Feature_Table()
                 ]
-
 
 if __name__ == '__main__':
     luigi.run()
