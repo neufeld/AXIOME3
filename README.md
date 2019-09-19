@@ -5,6 +5,8 @@
 
 Currently, it uses qiime2 version 2019-07
 
+**Noe that previous versions of qiim2 may cause problems**
+
 ## Required packages
 Refer to 16S-luigi.yml file
 
