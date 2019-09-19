@@ -26,43 +26,43 @@ You should just do...
 
 
 <br />
-#####1. activate your qiime environment 
+##### 1. activate your qiime environment 
 
 `conda activate <YOUR_QIIME_ENV>`
 
 <br />
-#####2. Make sure pip and python are pointing to anaconda packages *not to /usr/bin*
+##### 2. Make sure pip and python are pointing to anaconda packages *not to /usr/bin*
 
 `which pip` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip`
 
 `which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
 
 <br />
-#####3. Install luigi by running the command...
+##### 3. Install luigi by running the command...
 
 `pip install luigi`
 
 <br />
-#####4. Install BioPython and pandas (Jackson's script depends on these packages)
+##### 4. Install BioPython and pandas (Jackson's script depends on these packages)
 
 `conda install -c bioconda biopython pandas`
 
 <br />
-#####5. Add PATH variable (so that you can access Jackson's script on the server)
+##### 5. Add PATH variable (so that you can access Jackson's script on the server)
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
 
-######1. Use your choice of text editor to open ~/.bashrc file.
+###### 1. Use your choice of text editor to open ~/.bashrc file.
 
 For example, (I use "vim" text editor)
 
 `vim ~/.bashrc`
 
-######2. Go to the end of the file
+###### 2. Go to the end of the file
 
 For vim users, you can press G (uppercase G; it is case-sensitive!) 
 
-######3. Add 'PATH=${PATH}:/Data/reference/databases/qiime2/qiime2-helpers/scripts' to the end of the file
+###### 3. Add 'PATH=${PATH}:/Data/reference/databases/qiime2/qiime2-helpers/scripts' to the end of the file
 
 For vim users, do the following steps...
 
@@ -76,13 +76,10 @@ c) Add the following lines
 ```
 # Temporary PATH variable to access Jackson's script
 PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
-		```
+```
 
-######d) Press Esc button once or twice
+###### d) Press Esc button once or twice
 
-######e) Press : (colon), and type wq to save and exit
+###### e) Press : (colon), and type wq to save and exit
 
 `:wq`
-
-
-```
