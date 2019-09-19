@@ -18,12 +18,9 @@ You may run the following code to create conda virtual environment
 
 #### You already have a conda environment for qiime2
 <br />
-<br />
-
 In this case, you do not necessarily need to install a new virtual environment from .yml file.
 
 You should just do...
-
 
 <br />
 ##### 1. activate your qiime environment 
@@ -67,11 +64,11 @@ For vim users, you can press G (uppercase G; it is case-sensitive!)
 For vim users, do the following steps...
 
 <br />
-a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
+...a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
 
-b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
+...b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
 
-c) Add the following lines
+...c) Add the following lines
 
 ```
 # Temporary PATH variable to access Jackson's script
