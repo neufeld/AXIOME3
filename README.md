@@ -5,7 +5,7 @@
 
 Currently, it uses qiime2 version 2019-07
 
-**Noe that previous versions of qiim2 may cause problems**
+**Note that previous versions of qiim2 may cause problems**
 
 ## Required packages
 Refer to 16S-luigi.yml file
@@ -27,11 +27,7 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `cd Neufeld-16S-Pipeline`
 
-<br />
-
-*<Installation step diverges from here depending on your existing virtual environment.>*
-	
-<br />
+*Installation step diverges from here depending on your existing virtual environment.*
 
 ### You don't have a qiime virtual environment yet
 
@@ -61,12 +57,8 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `conda install -c bioconda biopython pandas`
 
-<br />
-
-*<Installation step converges from here>*
+*Installation step converges from here*
 	
-<br />
-
 4. Activate your qiime2 environment (if you already activated, ignore this step).
 
 `conda activate <QIIME_ENV>`
