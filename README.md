@@ -27,7 +27,11 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `cd Neufeld-16S-Pipeline`
 
-*Installation step diverges from here depending on your existing virtual environment.*
+<br />
+
+**_"Installation step diverges from here depending on your existing virtual environment."_**
+
+<br />
 
 ### You don't have a qiime virtual environment yet
 
