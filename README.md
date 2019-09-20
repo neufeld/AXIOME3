@@ -77,17 +77,17 @@ For people who are not familiar with commandline interface, you may follow the i
 
 ### Adding PATH variable Example
 
-###### 1. Use your choice of text editor to open ~/.bashrc file.
+##### 1. Use your choice of text editor to open ~/.bashrc file.
 
 For example, (I use "vim" text editor)
 
 `vim ~/.bashrc`
 
-###### 2. Go to the end of the file
+##### 2. Go to the end of the file
 
 For vim users, press G (uppercase G; it is case-sensitive!) 
 
-###### 3. Add 'PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts' to the end of the file
+##### 3. Add 'PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts' to the end of the file
 
 For vim users, you may do the following...
 
@@ -108,7 +108,7 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 
 `:wq`
 
-##### 6. In the terminal, run
+##### 4. In the terminal, run
 
 `source ~/.bashrc`
 
@@ -126,8 +126,7 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
-	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]> \
-	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
+	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]>
 ```
 
 Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default settings.  
@@ -135,8 +134,7 @@ If this is the case, simply do
 
 ```
 python luigi_config_generator.py \
-	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
-	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> 
 ```
 
 2. Run luigi pipeline to generate summary file for you to examine it.
@@ -154,8 +152,12 @@ python luigi_config_generator.py \
 	--trunc-len-f <TRUNC_LEN_F_VALUE [default = 250]> \
 	--trim-left-r <TRIM_LEFT_R_VALUE [default = 20]> \
 	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]> \
-	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
+	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]>
 ```
+
+_Note that if you do NOT specify path to taxonomy classifier, it will use qiim2-2019-07 version by default._
+
+**_It is important that the classifier version that MATCHES the qiime 2 version. It will throw an error otherwise_**
 
 4. Run luigi pipeline to run the rest of the worflow.
 
