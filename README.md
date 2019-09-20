@@ -61,7 +61,11 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `conda install -c bioconda biopython pandas`
 
-*Installation step converges from here*
+<br />
+
+**_Installation step converges from here_**
+
+<br />
 	
 4. Activate your qiime2 environment (if you already activated, ignore this step).
 
@@ -71,7 +75,7 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
 
-<br />
+### Adding PATH variable Example
 
 ###### 1. Use your choice of text editor to open ~/.bashrc file.
 
