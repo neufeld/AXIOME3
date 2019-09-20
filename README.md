@@ -143,6 +143,31 @@ python luigi_config_generator.py \
 python 16S_pipeline.py Summarize --local-scheduler
 ```
 
+When it's done running you should see something like this
+
+```
+===== Luigi Execution Summary =====
+
+Scheduled 2 tasks of which:
+* 2 ran successfully:
+    - 1 Import_Data(sample_type=SampleData[PairedEndSequencesWithQuality], input_format=PairedEndFastqManifestPhred33)
+    - 1 Summarize()
+
+This progress looks :) because there were no failed tasks or missing dependencies
+
+===== Luigi Execution Summary =====
+```
+
+Examine your working directory. You will see a new directory called "output".
+
+```
+output/
+├── paired-end-demux.qza
+└── paired-end-demux.qzv
+```
+
+You may examine "paired-end-demux.qzv" file in qiime2 View to determine trim and truncation cutoff.
+
 3. Generate configuration file again (to specify other options).
 
 ```
