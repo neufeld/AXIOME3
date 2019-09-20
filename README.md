@@ -27,7 +27,11 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `cd Neufeld-16S-Pipeline`
 
-**Installation step diverges from here depending on your existing virtual environment.**
+<br />
+
+*<Installation step diverges from here depending on your existing virtual environment.>*
+	
+<br />
 
 ### You don't have a qiime virtual environment yet
 
@@ -57,8 +61,11 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `conda install -c bioconda biopython pandas`
 
+<br />
 
-**Installation step converges from here**
+*<Installation step converges from here>*
+	
+<br />
 
 4. Activate your qiime2 environment (if you already activated, ignore this step).
 
