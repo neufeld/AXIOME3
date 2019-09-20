@@ -51,9 +51,12 @@ def args_parse():
     parser.add_argument('--classifier', help="""
             Path to the classifier file. Make sure to use the classifier that
             matches your qiime2 version. (It will fail if the version
-            mismatches).
+            mismatches) [ default = qiime2-2019-07 version ]
             """,
-            required=True)
+            default="""
+                /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza
+            """
+            )
 
     return parser
 

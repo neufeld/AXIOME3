@@ -14,39 +14,57 @@ You may run the following code to create conda virtual environment
 
 `conda env create -f 16S-luigi.yml`
 
-## Setting up conda virtual environment
+## Setting up conda virtual environment (only has to be done once)
 
-First, change directory to this repo.
+1. Clone this repository to your home directory.
+
+```
+cd ~
+git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
+```
+
+2. Change to Neufeld-16S-Pipeline directory.
 
 `cd Neufeld-16S-Pipeline`
 
-### You already have a conda environment for qiime2
+**Installation step diverges from here depending on your existing virtual environment.**
+
+### You don't have a qiime virtual environment yet
+
+3.a. In this case, you can install conda environment directly from .yml file in this repository.
+
+`conda env create --name <ENV_NAME> --file conda_env_file/16S-luigi.yml`
+
+### You already have an existing conda environment for qiime2 version 2019-07
 <br />
-In this case, you do not necessarily need to install a new virtual environment from .yml file.
+3.b. In this case, you should just do...
 
-You should just do...
-
-<br />
-
-##### 1. activate your qiime environment 
+##### i) activate your qiime environment 
 
 `conda activate <YOUR_QIIME_ENV>`
 
-##### 2. Make sure pip and python are pointing to anaconda packages *not to /usr/bin*
+##### ii) Make sure pip and python are pointing to anaconda packages **not to /usr/bin**
 
 `which pip` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip`
 
 `which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
 
-##### 3. Install luigi by running the command...
+##### iii) Install luigi by running the command...
 
 `pip install luigi`
 
-##### 4. Install BioPython and pandas (Jackson's script depends on these packages)
+##### iv) Install BioPython and pandas (Jackson's script depends on these packages)
 
 `conda install -c bioconda biopython pandas`
 
-##### 5. Add PATH variable (so that you can access Jackson's script on the server)
+
+**Installation step converges from here**
+
+4. Activate your qiime2 environment (if you already activated, ignore this step).
+
+`conda activate <QIIME_ENV>`
+
+5. Add PATH variable (so that you can access Jackson's script on the server).
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
 
@@ -64,7 +82,7 @@ For vim users, press G (uppercase G; it is case-sensitive!)
 
 ###### 3. Add 'PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts' to the end of the file
 
-For vim users, do the following...
+For vim users, you may do the following...
 
 &nbsp;&nbsp;&nbsp;a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
 
@@ -79,7 +97,7 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 
 &nbsp;&nbsp;&nbsp;d) Press Esc button once or twice
 
-&nbsp;&nbsp;&nbsp;e) Press : (colon), and type wq to save and exit
+&nbsp;&nbsp;&nbsp;e) Press : (colon), and type wq to write and quit.
 
 `:wq`
 
@@ -89,17 +107,13 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 
 <br />
 
-### You don't have qiime virtual environment yet
-
-In this case, you can install conda environment directly from .yml file in this repository.
-
-`conda env create --name <ENV_NAME> --file conda_env_file/16S-luigi.yml`
-
-Then, add PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts to your .bashrc file
-
 ## Usage
 
-1. Generate configuration file by running luigi_config_generator.py
+### For people who are not comfortable with linux terminal
+
+0. Activate conda environment and cd to Neufeld-16S-Pipeline (if you haven't already done so).
+
+1. Generate configuration file by running luigi_config_generator.py.
 
 ```
 python luigi_config_generator.py \
@@ -109,7 +123,7 @@ python luigi_config_generator.py \
 	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
 ```
 
-Note that *you don't have to* specify `--sample-type` and `--input-format` if you okay with the default settings.  
+Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default settings.  
 If this is the case, simply do
 
 ```
@@ -118,13 +132,13 @@ python luigi_config_generator.py \
 	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
 ```
 
-2. Run luigi pipeline to generate summary file for you to examine it
+2. Run luigi pipeline to generate summary file for you to examine it.
 
 ```
 python 16S_pipeline.py Summarize --local-scheduler
 ```
 
-3. Generate configuration file again (to specify other options)
+3. Generate configuration file again (to specify other options).
 
 ```
 python luigi_config_generator.py \
@@ -136,13 +150,36 @@ python luigi_config_generator.py \
 	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE>
 ```
 
-4. Run luigi pipeline to run the rest of the worflow
+4. Run luigi pipeline to run the rest of the worflow.
 
 ```
 python 16S_pipeline.py Production_Mode --local-scheduler
 ```
 
+5. This will create the output directory that contains all your outputs. Make sure to move/clean up this directory after your done.
 
-5. This will create the output directory that contains all your outputs. Make sure to move/clean up this directory after your done
+**luigi may not run if this directory is not properly cleaned up**
 
-_luigi may not run if this directory is not properly cleaned up_
+### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
+
+1. Change directory to "configuration directory".
+
+`cd configuration`
+
+2. Copy template config file, and rename the copied config as luigi.cfg.
+
+`cp template.cfg luigi.cfg`
+
+3. Edit luigi.cfg to change qiime2 options.
+4. cd to the previous dir and run pipeline to get the summary file.
+
+```
+cd ..
+python 16S_pipeline.py Summarize --local-scheduler
+```
+
+5. Inspect the .qzv file, and edit `luigi.cfg` to modify parameters.
+
+6. Run the pipeline again to finish the rest of the workflow.
+
+`python 16S_pipeline.py Production_Mode --local-scheduler`
