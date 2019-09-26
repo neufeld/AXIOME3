@@ -3,12 +3,15 @@
 ## About
 16S RNA analysis workflow based on qiime2 wrapped in luigi framework.
 
-Currently, it uses qiime2 version 2019-07
+Currently, it uses conda 4.7.12 and qiime2 version 2019-07
 
-**Note that previous versions of qiim2 may cause problems**
+**Note that previous versions of conda may cause problems**
 
 ## Required packages
-Refer to 16S-luigi.yml file
+**conda 4.7.12** (No guarantee previous versions of conda will work!)  
+**qiime2 (tested with 2019-04 and 2019-07)**
+
+Refer to 16S-luigi.yml file for details
 
 You may run the following code to create conda virtual environment
 
