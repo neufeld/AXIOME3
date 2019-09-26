@@ -123,18 +123,35 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 1. Generate configuration file by running luigi_config_generator.py.
 
 ```
+- General Format -
+
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
 	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]>
+	
+-----------------------------------------------------------------------------
+- Actual Example -
+
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--sample-type SampleData[PairedEndSequencesWithQuality] \
+	--input-format PairedEndFastqManifestPhred33
 ```
 
 Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default settings.  
 If this is the case, simply do
 
 ```
+- General Format -
+
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> 
+-----------------------------------------------------------------------------
+- Actual Example -
+
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt
 ```
 
 2. Run luigi pipeline to generate summary file for you to examine it.
@@ -171,6 +188,8 @@ You may examine "paired-end-demux.qzv" file in qiime2 View to determine trim and
 3. Generate configuration file again (to specify other options).
 
 ```
+- General Format -
+
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--trim-left-f <TRIM_LEFT_F_VALUE [default = 19]> \
@@ -178,9 +197,31 @@ python luigi_config_generator.py \
 	--trim-left-r <TRIM_LEFT_R_VALUE [default = 20]> \
 	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]> \
 	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--trim-left-f 19 \
+	--trunc-len-f 250 \
+	--trim-left-r 20 \
+	--trunc-len-r 250 \
+	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza
 ```
 
-_Note that if you do NOT specify path to taxonomy classifier, it will use qiim2-2019-07 version by default._
+_(Again) Note that if you are okay with default values, you can run the command below instead._
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> 
+-----------------------------------------------------------------------------
+- Actual Example -
+
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt
+```
 
 **_It is important that the classifier version that MATCHES the qiime 2 version. It will throw an error otherwise_**
 
