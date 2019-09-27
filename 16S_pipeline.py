@@ -7,12 +7,6 @@ import logging
 # Define custom logger
 logger = logging.getLogger("custom logger")
 
-# Define output paths
-out_dir = "output"
-denoise_dir = os.path.join(out_dir, "dada2")
-taxonomy_dir = os.path.join(out_dir, "taxonomy")
-export_dir = os.path.join(out_dir, "exported")
-
 # Path to configuration file to be used
 luigi.configuration.add_config_path("configuration/luigi.cfg")
 
@@ -25,8 +19,24 @@ def run_cmd(cmd, step):
             err=err
             ))
         sys.exit(1)
+    except Exception as err:
+        logger.error("In {step} unknown error occured\n{err}".format(
+            step=step,
+            err=err
+            ))
+        raise err
 
     return output
+
+class Out_Prefix(luigi.Config):
+    prefix = luigi.Parameter()
+
+class Output_Dirs(luigi.Config):
+    # Define output paths
+    out_dir = Out_Prefix().prefix
+    denoise_dir = os.path.join(out_dir, "dada2")
+    taxonomy_dir = os.path.join(out_dir, "taxonomy")
+    export_dir = os.path.join(out_dir, "exported")
 
 class Samples(luigi.Config):
     """
@@ -44,7 +54,7 @@ class Import_Data(luigi.Task):
     input_format = luigi.Parameter(default="PairedEndFastqManifestPhred33")
 
     def output(self):
-        paired_end_demux = os.path.join(out_dir, "paired-end-demux.qza")
+        paired_end_demux = os.path.join(Output_Dirs().out_dir, "paired-end-demux.qza")
 
         return luigi.LocalTarget(paired_end_demux)
 
@@ -53,7 +63,7 @@ class Import_Data(luigi.Task):
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                out_dir],
+                Output_Dirs().out_dir],
                 self)
 
         inputPath = Samples().manifest_file
@@ -91,7 +101,7 @@ class Summarize(luigi.Task):
         return Import_Data()
 
     def output(self):
-        summary_file = os.path.join(out_dir, "paired-end-demux.qzv")
+        summary_file = os.path.join(Output_Dirs().out_dir, "paired-end-demux.qzv")
 
         return luigi.LocalTarget(summary_file)
 
@@ -100,7 +110,7 @@ class Summarize(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                out_dir],
+                Output_Dirs().out_dir],
                 step)
 
         # Generate summary file
@@ -125,10 +135,10 @@ class Denoise(luigi.Task):
         return Import_Data()
 
     def output(self):
-        denoise_table = os.path.join(denoise_dir, "dada2-table.qza")
-        rep_seqs = os.path.join(denoise_dir, "dada2-rep-seqs.qza")
-        denoise_stats = os.path.join(denoise_dir, "stats-dada2.qza")
-        dada2_log = os.path.join(denoise_dir, "dada2_log.txt")
+        denoise_table = os.path.join(Output_Dirs().denoise_dir, "dada2-table.qza")
+        rep_seqs = os.path.join(Output_Dirs().denoise_dir, "dada2-rep-seqs.qza")
+        denoise_stats = os.path.join(Output_Dirs().denoise_dir, "stats-dada2.qza")
+        dada2_log = os.path.join(Output_Dirs().denoise_dir, "dada2_log.txt")
 
         out = {
                 "table": luigi.LocalTarget(denoise_table),
@@ -144,7 +154,7 @@ class Denoise(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                denoise_dir],
+                Output_Dirs().denoise_dir],
                 step)
 
         # Run dada2
@@ -183,7 +193,7 @@ class Denoise_Tabulate(luigi.Task):
         return Denoise()
 
     def output(self):
-        denoise_tabulated = os.path.join(denoise_dir, "stats-dada2.qzv")
+        denoise_tabulated = os.path.join(Output_Dirs().denoise_dir, "stats-dada2.qzv")
 
         return luigi.LocalTarget(denoise_tabulated)
 
@@ -193,7 +203,7 @@ class Denoise_Tabulate(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                denoise_dir],
+                Output_Dirs().denoise_dir],
                 step)
 
         # Run qiime metadata tabulate
@@ -215,8 +225,8 @@ class Taxonomic_Classification(luigi.Task):
         return Denoise()
 
     def output(self):
-        classified_taxonomy = os.path.join(taxonomy_dir, "taxonomy.qza")
-        taxonomy_log = os.path.join(taxonomy_dir, "taxonomy_log.txt")
+        classified_taxonomy = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy.qza")
+        taxonomy_log = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy_log.txt")
 
         output = {
                 "taxonomy": luigi.LocalTarget(classified_taxonomy),
@@ -231,7 +241,7 @@ class Taxonomic_Classification(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                taxonomy_dir],
+                Output_Dirs().taxonomy_dir],
                 step)
 
         # Run qiime classifier
@@ -260,7 +270,7 @@ class Taxonomy_Tabulate(luigi.Task):
         return Taxonomic_Classification()
 
     def output(self):
-        tabulated = os.path.join(taxonomy_dir, "taxonomy.qzv")
+        tabulated = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy.qzv")
 
         return luigi.LocalTarget(tabulated)
 
@@ -270,7 +280,7 @@ class Taxonomy_Tabulate(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                taxonomy_dir],
+                Output_Dirs().taxonomy_dir],
                 step)
 
         # Tabulate taxonomy classification result
@@ -290,7 +300,7 @@ class Export_Feature_Table(luigi.Task):
         return Denoise()
 
     def output(self):
-        biom = os.path.join(export_dir, "feature-table.biom")
+        biom = os.path.join(Output_Dirs().export_dir, "feature-table.biom")
 
         return luigi.LocalTarget(biom)
 
@@ -299,7 +309,7 @@ class Export_Feature_Table(luigi.Task):
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                export_dir],
+                Output_Dirs().export_dir],
                 step)
 
         # Export file
@@ -319,7 +329,7 @@ class Export_Taxonomy(luigi.Task):
         return Taxonomic_Classification()
 
     def output(self):
-        tsv = os.path.join(export_dir, "taxonomy.tsv")
+        tsv = os.path.join(Output_Dirs().export_dir, "taxonomy.tsv")
 
         return luigi.LocalTarget(tsv)
 
@@ -328,7 +338,7 @@ class Export_Taxonomy(luigi.Task):
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                export_dir],
+                Output_Dirs().export_dir],
                 step)
 
         # Export file
@@ -348,7 +358,7 @@ class Export_Representative_Seqs(luigi.Task):
         return Denoise()
 
     def output(self):
-        fasta = os.path.join(export_dir, "dna-sequences.fasta")
+        fasta = os.path.join(Output_Dirs().export_dir, "dna-sequences.fasta")
 
         return luigi.LocalTarget(fasta)
 
@@ -357,7 +367,7 @@ class Export_Representative_Seqs(luigi.Task):
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                export_dir],
+                Output_Dirs().export_dir],
                 step)
 
         # Export file
@@ -377,7 +387,7 @@ class Convert_Biom_to_TSV(luigi.Task):
         return Export_Feature_Table()
 
     def output(self):
-        tsv = os.path.join(export_dir, "feature-table.tsv")
+        tsv = os.path.join(Output_Dirs().export_dir, "feature-table.tsv")
 
         return luigi.LocalTarget(tsv)
 
@@ -386,7 +396,7 @@ class Convert_Biom_to_TSV(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                export_dir],
+                Output_Dirs().export_dir],
                 step)
 
         # Convert to TSV
@@ -410,8 +420,8 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 }
 
     def output(self):
-        combined_table = os.path.join(export_dir, "ASV_table_combined.tsv")
-        log = os.path.join(export_dir, "ASV_table_combined.log")
+        combined_table = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.tsv")
+        log = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.log")
 
         output = {
                 "table": luigi.LocalTarget(combined_table),
@@ -426,7 +436,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                export_dir],
+                Output_Dirs().export_dir],
                 step)
 
         # Run Jackson's script
