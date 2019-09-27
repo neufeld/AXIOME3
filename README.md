@@ -74,7 +74,7 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `conda activate <QIIME_ENV>`
 
-5. Add PATH variable (so that you can access Jackson's script on the server).
+5. Add `/Data/reference_databases/qiime2/qiime2-helpers/scripts` to PATH variable (so that you can access Jackson's script on the server).
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
 
