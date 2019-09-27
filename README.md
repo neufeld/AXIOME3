@@ -42,6 +42,10 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `conda env create --name <ENV_NAME> --file conda_env_file/16S-luigi.yml`
 
+*Make sure to replace <ENV_NAME> with actual name*
+
+e.g. `conda env create --name qiime_luigi --file conda_env_file/16S-luigi.yml`
+
 ### You already have an existing conda environment for qiime2 version 2019-07
 <br />
 3.b. In this case, you should just do...
@@ -234,9 +238,63 @@ python luigi_config_generator.py \
 python 16S_pipeline.py Production_Mode --local-scheduler
 ```
 
-5. This will create the output directory that contains all your outputs. Make sure to move/clean up this directory after your done.
+When it's done running, your screen should look something like this
+
+```
+===== Luigi Execution Summary =====
+
+Scheduled 12 tasks of which:
+* 2 complete ones were encountered:
+    - 1 Import_Data(sample_type=SampleData[PairedEndSequencesWithQuality], input_format=PairedEndFastqManifestPhred33)
+    - 1 Summarize()
+* 10 ran successfully:
+    - 1 Convert_Biom_to_TSV()
+    - 1 Denoise(trim_left_f=19, trunc_len_f=250, trim_left_r=20, trunc_len_r=250, n_threads=10)
+    - 1 Denoise_Tabulate()
+    - 1 Export_Feature_Table()
+    - 1 Export_Representative_Seqs()
+    ...
+
+This progress looks :) because there were no failed tasks or missing dependencies
+
+===== Luigi Execution Summary =====
+```
+
+5. Your "output" directory should looks something like this
+
+```
+output/
+├── dada2
+│   ├── dada2_log.txt
+│   ├── dada2-rep-seqs.qza
+│   ├── dada2-table.qza
+│   ├── stats-dada2.qza
+│   └── stats-dada2.qzv
+├── exported
+│   ├── ASV_table_combined.log
+│   ├── ASV_table_combined.tsv
+│   ├── dna-sequences.fasta
+│   ├── feature-table.biom
+│   ├── feature-table.tsv
+│   └── taxonomy.tsv
+├── paired-end-demux.qza
+├── paired-end-demux.qzv
+└── taxonomy
+    ├── taxonomy_log.txt
+    ├── taxonomy.qza
+    └── taxonomy.qzv
+```
+
+6. Make sure to rename/move (or remove) this directory after your done.
 
 **luigi may not run if this directory is not properly cleaned up**
+
+#### Moving directory example
+Let's say you want to move "output" directory to your home directory, and rename it to "Foo".
+
+You may run the command below to do so.
+
+`mv output ~/foo` ("~" means home directory fyi)
 
 ### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
 
