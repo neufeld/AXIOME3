@@ -282,10 +282,10 @@ This progress looks :) because there were no failed tasks or missing dependencie
 ===== Luigi Execution Summary =====
 ```
 
-5. Your "output" directory should looks something like this
+5. Your output directory should looks something like this
 
 ```
-output/
+test/
 ├── dada2
 │   ├── dada2_log.txt
 │   ├── dada2-rep-seqs.qza
