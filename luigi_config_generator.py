@@ -72,7 +72,7 @@ def args_parse():
             Name of the output directory. All the outputs will be stored in
             this directory.
             """,
-            required=True)
+            default="output")
 
     parser.add_argument('--is-first', help="""
             First time running? If so, it will warn users if the same output
@@ -138,7 +138,7 @@ def check_env():
         "> Should print something like " +\
         "{GREEN}/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip{END}\n".format(**formatters) +\
         "> Install luigi\n" +\
-        "{RED}conda install -c bioconda biopython pandas{END}\n".format(
+        "{RED}pip install luigi{END}\n".format(
                 **formatters
                 )
         print(msg)
