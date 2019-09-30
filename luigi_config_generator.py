@@ -162,9 +162,8 @@ def check_env():
 def check_outdir(outdir, is_first):
     if(is_first):
         if(os.path.isdir(outdir)):
-            msg = "The output directory with the same name already exists!\n" +\
-                    "Please remove/rename the existing direcotry or " +\
-                    "change the value for --out-prefix"
+            msg = "'output' directory already exists!\n" +\
+                    "Please remove/rename/move the existing directory"
             print()
             print(msg)
             print()
