@@ -135,7 +135,9 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
-	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]>
+	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]> \
+	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
+	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 	
 -----------------------------------------------------------------------------
 - Actual Example -
@@ -143,8 +145,12 @@ python luigi_config_generator.py \
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--sample-type SampleData[PairedEndSequencesWithQuality] \
-	--input-format PairedEndFastqManifestPhred33
+	--input-format PairedEndFastqManifestPhred33 \
+	--out-prefix test \
+	--is-first yes
 ```
+
+**_For --out-prefix, just use one word. For example, Run19, Run20, etc. This will create a directory named Run19 (or Run20 or whatever value you specified), and store all the outputs in this directory_**
 
 Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default settings.  
 If this is the case, simply do
@@ -153,12 +159,16 @@ If this is the case, simply do
 - General Format -
 
 python luigi_config_generator.py \
-	--manifest <PATH_TO_YOUR_MANIFEST_FILE> 
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
+	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
-	--manifest /Winnebago/danielm710/input/ManifestFile.txt
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--out-prefix test \
+	--is-first yes
 ```
 
 2. Run luigi pipeline to generate summary file for you to examine it.
@@ -185,7 +195,7 @@ This progress looks :) because there were no failed tasks or missing dependencie
 Examine your working directory. You will see a new directory called "output".
 
 ```
-output/
+test/
 ├── paired-end-demux.qza
 └── paired-end-demux.qzv
 ```
@@ -203,7 +213,9 @@ python luigi_config_generator.py \
 	--trunc-len-f <TRUNC_LEN_F_VALUE [default = 250]> \
 	--trim-left-r <TRIM_LEFT_R_VALUE [default = 20]> \
 	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]> \
-	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]>
+	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]> \
+	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
+	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
@@ -213,7 +225,9 @@ python luigi_config_generator.py \
 	--trunc-len-f 250 \
 	--trim-left-r 20 \
 	--trunc-len-r 250 \
-	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza
+	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza \
+	--out-prefix test \
+	--is-first no
 ```
 
 _(Again) Note that if you are okay with default values, you can run the command below instead._
@@ -222,20 +236,28 @@ _(Again) Note that if you are okay with default values, you can run the command 
 - General Format -
 
 python luigi_config_generator.py \
-	--manifest <PATH_TO_YOUR_MANIFEST_FILE> 
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
+	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
-	--manifest /Winnebago/danielm710/input/ManifestFile.txt
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--out-prefix test \
+	--is-first no
 ```
 
-**_It is important that the classifier version that MATCHES the qiime 2 version. It will throw an error otherwise_**
+**_It is important that the classifier version MATCHES the qiime 2 version. It will throw an error otherwise_**
+
+**_VERY IMPORTANT_**  
+**_--out-prefix value MUST match the value you used for the first time_**  
+**_For example, if you specified foo for --out-prefix for the first time, but specifies bar for --out-prefix the second time, it will throw an error._**
 
 4. Run luigi pipeline to run the rest of the worflow.
 
 ```
-python 16S_pipeline.py Production_Mode --local-scheduler
+python 16S_pipeline.py Run_All --local-scheduler
 ```
 
 When it's done running, your screen should look something like this
@@ -318,4 +340,4 @@ python 16S_pipeline.py Summarize --local-scheduler
 
 6. Run the pipeline again to finish the rest of the workflow.
 
-`python 16S_pipeline.py Production_Mode --local-scheduler`
+`python 16S_pipeline.py Run_All --local-scheduler`
