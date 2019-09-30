@@ -11,11 +11,7 @@ Currently, it uses conda 4.7.12 and qiime2 version 2019-07
 **conda 4.7.12** (No guarantee previous versions of conda will work!)  
 **qiime2 (tested with 2019-04 and 2019-07)**
 
-Refer to 16S-luigi.yml file for details
-
-You may run the following code to create conda virtual environment
-
-`conda env create -f 16S-luigi.yml`
+Refer to 16S-luigi.yml file for details.
 
 ## Setting up conda virtual environment (only has to be done once)
 
@@ -30,13 +26,7 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 `cd Neufeld-16S-Pipeline`
 
-<br />
-
-**_"Installation step diverges from here depending on your existing virtual environment."_**
-
-<br />
-
-### You don't have a qiime virtual environment yet
+### You don't have a qiime virtual environment yet OR You want to create a new conda environment for the pipeline
 
 3.a. In this case, you can install conda environment directly from .yml file in this repository.
 
@@ -46,7 +36,9 @@ git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
 
 e.g. `conda env create --name qiime_luigi --file conda_env_file/16S-luigi.yml`
 
-### You already have an existing conda environment for qiime2 version 2019-07
+Then, go to Step 4. (Activate your qiime2 environment)
+
+### You already have an existing conda environment for qiime2 version 2019-07 AND don't mind updating the existing environment
 <br />
 3.b. In this case, you should just do...
 
@@ -60,6 +52,10 @@ e.g. `conda env create --name qiime_luigi --file conda_env_file/16S-luigi.yml`
 
 `which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
 
+If you get something different (for example `/usr/local/bin/pip`, and `/usr/bin/python`), check if you have activated conda environment.
+
+If you still get different messages, ask lab bioinformaticians for help.
+
 ##### iii) Install luigi by running the command...
 
 `pip install luigi`
@@ -67,18 +63,12 @@ e.g. `conda env create --name qiime_luigi --file conda_env_file/16S-luigi.yml`
 ##### iv) Install BioPython and pandas (Jackson's script depends on these packages)
 
 `conda install -c bioconda biopython pandas`
-
-<br />
-
-**_Installation step converges from here_**
-
-<br />
 	
 4. Activate your qiime2 environment (if you already activated, ignore this step).
 
-`conda activate <QIIME_ENV>`
+`conda activate <QIIME_ENV>` (Replace <QIIME_ENV> with the environment name you chose)
 
-5. Add `/Data/reference_databases/qiime2/qiime2-helpers/scripts` to PATH variable (so that you can access Jackson's script on the server).
+5. Export `/Data/reference_databases/qiime2/qiime2-helpers/scripts` as a PATH variable (so that you can access Jackson's script on the server).
 
 For people who are not familiar with commandline interface, you may follow the instruction below.
 
@@ -119,6 +109,8 @@ PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
 
 `source ~/.bashrc`
 
+If you don't run this command, any changes you made in .bashrc file will NOT take effects (until you close the terminal and restart it)
+
 <br />
 
 ## Usage
@@ -136,7 +128,6 @@ python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
 	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]> \
-	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
 	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 	
 -----------------------------------------------------------------------------
@@ -146,28 +137,23 @@ python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--sample-type SampleData[PairedEndSequencesWithQuality] \
 	--input-format PairedEndFastqManifestPhred33 \
-	--out-prefix test \
 	--is-first yes
 ```
 
-**_For --out-prefix, just use one word. For example, Run19, Run20, etc. This will create a directory named Run19 (or Run20 or whatever value you specified), and store all the outputs in this directory_**
-
-Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default settings.  
-If this is the case, simply do
+Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default values.  
+If this is the case, simply run
 
 ```
 - General Format -
 
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
-	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
 	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
-	--out-prefix test \
 	--is-first yes
 ```
 
@@ -177,7 +163,7 @@ python luigi_config_generator.py \
 python 16S_pipeline.py Summarize --local-scheduler
 ```
 
-When it's done running you should see something like this
+When it's done running you should see something like this (takes some time to run)
 
 ```
 ===== Luigi Execution Summary =====
@@ -195,7 +181,7 @@ This progress looks :) because there were no failed tasks or missing dependencie
 Examine your working directory. You will see a new directory called "output".
 
 ```
-test/
+output/
 ├── paired-end-demux.qza
 └── paired-end-demux.qzv
 ```
@@ -214,7 +200,6 @@ python luigi_config_generator.py \
 	--trim-left-r <TRIM_LEFT_R_VALUE [default = 20]> \
 	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]> \
 	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]> \
-	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
 	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
@@ -226,7 +211,6 @@ python luigi_config_generator.py \
 	--trim-left-r 20 \
 	--trunc-len-r 250 \
 	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza \
-	--out-prefix test \
 	--is-first no
 ```
 
@@ -237,22 +221,16 @@ _(Again) Note that if you are okay with default values, you can run the command 
 
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
-	--out-prefix <OUTPUT PREFIX; MUST be relative to this direcotry> \
 	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
-	--out-prefix test \
 	--is-first no
 ```
 
 **_It is important that the classifier version MATCHES the qiime 2 version. It will throw an error otherwise_**
-
-**_VERY IMPORTANT_**  
-**_--out-prefix value MUST match the value you used for the first time_**  
-**_For example, if you specified foo for --out-prefix for the first time, but specifies bar for --out-prefix the second time, it will throw an error._**
 
 4. Run luigi pipeline to run the rest of the worflow.
 
@@ -260,7 +238,7 @@ python luigi_config_generator.py \
 python 16S_pipeline.py Run_All --local-scheduler
 ```
 
-When it's done running, your screen should look something like this
+When it's done running, your screen should look something like this (takes some time to run)
 
 ```
 ===== Luigi Execution Summary =====
@@ -282,10 +260,10 @@ This progress looks :) because there were no failed tasks or missing dependencie
 ===== Luigi Execution Summary =====
 ```
 
-5. Your output directory should looks something like this
+5. Your "output" directory (directory named "output") should look something like this
 
 ```
-test/
+output/
 ├── dada2
 │   ├── dada2_log.txt
 │   ├── dada2-rep-seqs.qza
@@ -307,16 +285,18 @@ test/
     └── taxonomy.qzv
 ```
 
-6. Make sure to rename/move (or remove) this directory after your done.
+_if you don't see the above message (notice the smiley face, ":)"), or your output directory is missing some files, it means the pipeline is not successfully run. Check with the lab's bioinformatician if the error is not obvious_
 
-**luigi may not run if this directory is not properly cleaned up**
+6. Make sure to rename or move this directory to somewhere else when you are done running the pipeline.
+
+**by default, luigi pipeline looks at "output" directory to check for successful tasks, so if all the files already exist in this directory (e.g. from analyzing your previous samples), it will think there aren't any jobs to be run for the new samples since all the files are there.**
 
 #### Moving directory example
-Let's say you want to move "output" directory to your home directory, and rename it to "Foo".
+Let's say you want to move "output" directory to "Analysis" directory under the home directory, and rename it to "Illumina_Run3".
 
 You may run the command below to do so.
 
-`mv output ~/foo` ("~" means home directory fyi)
+`mv output ~/Analysis/Illumina_Run3` ("~" means home directory fyi)
 
 ### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
 
