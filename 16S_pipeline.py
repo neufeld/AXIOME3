@@ -457,7 +457,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
             fh.write(logged)
 
 
-class Production_Mode(luigi.Task):
+class Run_All(luigi.Task):
     def requires(self):
         return [
                 Import_Data(),
