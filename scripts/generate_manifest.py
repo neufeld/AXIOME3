@@ -66,6 +66,11 @@ def read_samplesheet(samplesheet_path):
             if(should_process and line):
                 info = line.split(",")
 
+                # Skip if blank line (deem as blank line if either ID or name
+                # is missing)
+                if not(info[0] or info[1]):
+                    continue
+
                 sample_id = info[0] # Sample ID
                 sample_name = info[1] # Sample Name
 
@@ -78,6 +83,11 @@ def read_samplesheet(samplesheet_path):
                             "the same name")
                     sys.exit(1)
                 processed_data[sample_name] = sample_id
+
+    if(len(processed_data) == 0):
+        print("ERROR!\n")
+        print("Samplesheet has zero samples\n")
+        sys.exit(1)
 
     return processed_data
 
