@@ -9,7 +9,7 @@ import os
 import time
 import logging
 import argparse
-import math
+import re
 
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
@@ -125,6 +125,58 @@ def sort_feature_table(feature_table):
     
     return(feature_table)
 
+def parse_silva_taxonomy_entry(taxonomy_entry, resolve = True):
+    """
+    Parse a single Silva taxonomy entry
+
+    :param taxonomy_entry: Silva taxonomy string (see example below)
+    :return: list of 7 rank entries for the taxonomy
+    """
+    # Example:
+    # D_0__Bacteria;D_1__Margulisbacteria;D_2__microbial mat metagenome;D_3__microbial mat metagenome;D_4__microbial mat metagenome;D_5__microbial mat metagenome;D_6__microbial mat metagenome
+
+    taxonomy_split = str(taxonomy_entry).split(sep=';')
+
+    if len(taxonomy_split) > 7:
+        logger.error('Taxonomy entry is ' + str(len(taxonomy_split)) + ' long, not 7 as expected. Exiting...')
+        logger.error('Entry was: "' + taxonomy_entry + '"')
+        sys.exit(1)
+    elif len(taxonomy_split) < 7:
+        # Sometimes Silva entries are short; rest is unresolved
+        for entry_index in range(len(taxonomy_split)+1, 8):
+            taxonomy_split.append('')
+
+    # Remove header pieces
+    # TODO - confirm they are in the right order (0,1,2,3,4,5,6)
+    taxonomy_split = [re.sub("D_[0-6]__", "", level) for level in taxonomy_split]
+
+    # Fill in empty parts, if they exist
+    if '' in taxonomy_split and resolve is True:
+        # Get the positions of the empty spots
+        empty_taxa = []
+        for taxonomy_level in taxonomy_split:
+            if taxonomy_level == '':
+                empty_taxa.append(True)
+            else:
+                empty_taxa.append(False)
+
+        # Get the numeric index of the first empty taxon
+        # See https://stackoverflow.com/a/9542768, accessed Sept. 18, 2019
+        first_empty_taxon = empty_taxa.index(True)
+
+        if False in empty_taxa[first_empty_taxon:]:
+            logger.error(
+                'There seems to be an empty entry in the middle of your taxonomy levels. Cannot resolve. Exiting...')
+            logger.error('Entry was: ' + ', '.join(taxonomy_entry))
+            sys.exit(1)
+
+        filler_entry = 'Unresolved_' + taxonomy_split[(first_empty_taxon - 1)]
+
+        for taxonomy_level_index in range(first_empty_taxon, 7):
+            taxonomy_split[taxonomy_level_index] = filler_entry
+
+    return (taxonomy_split)
+
 def main(args):
     # Set user variables
     feature_table_filepath = args.feature_table
@@ -134,10 +186,16 @@ def main(args):
     feature_id_colname = args.feature_id_colname
     sort_features = args.sort_features
     rename_features = args.rename_features
+    parse_taxonomy = args.parse_taxonomy
 
     # Set sort_features to True if rename_features is True
     if rename_features is True:
         sort_features = True
+
+    # Check that taxonomy_filepath is set if parse_taxonomy is True
+    if (parse_taxonomy is True) and (taxonomy_filepath is False):
+        logger.error('Specified --parse_taxonomy but did not specify --taxonomy_filepath. Exiting...')
+        sys.exit(1)
 
     # Startup messages
     logger.info('Running ' + os.path.basename(sys.argv[0]))
@@ -147,6 +205,7 @@ def main(args):
     logger.info('Feature ID colname: ' + str(feature_id_colname))
     logger.info('Sort Feature IDs roughly by relative abundance?: ' + str(sort_features))
     logger.info('Rename Feature IDs sequentially?: ' + str(rename_features))
+    logger.info('Parse Silva taxonomy into 7 ranks?: ' + str(parse_taxonomy))
 
     # Load the feature table
     logger.info('Loading feature table')
@@ -155,6 +214,21 @@ def main(args):
     # Add taxonomy
     if taxonomy_filepath is not False:
         feature_table = add_taxonomy_to_feature_table(feature_table, taxonomy_filepath)
+
+    # Parse taxonomy
+    if parse_taxonomy is True:
+        logger.info('Parsing taxonomy into 7 ranks')
+
+        # TODO - expose 'resolve' option to user
+        taxonomy_entries_parsed = map(lambda entry: parse_silva_taxonomy_entry(entry, resolve=True),
+                                      feature_table['Consensus.Lineage'].tolist())
+        taxonomy_table_parsed = pd.DataFrame(taxonomy_entries_parsed,
+                                             columns=['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus',
+                                                      'Species'])
+
+        # Bind to main table in place of 'Consensus.Lineage'
+        feature_table = pd.concat([feature_table, taxonomy_table_parsed], axis=1, sort=False)
+        feature_table = feature_table.drop(columns='Consensus.Lineage')
 
     # Add representative sequences
     if rep_seq_filepath is not False:
@@ -202,7 +276,8 @@ if __name__ == '__main__':
     parser.add_argument('-R', '--rename_features', required = False, action = 'store_true', 
                        help = 'Optionally rename the Feature IDs sequentially, roughly based on overall abundance. '
                        'Automatically sets --sort_features')
-    # TODO - add optional flag to parse taxonomy into 7 ranks
+    parser.add_argument('-P', '--parse_taxonomy', required=False, action='store_true',
+                        help= 'Optionally parse Silva taxonomy into 7 ranks with columns "domain", "phylum", etc.')
     # TODO - add option to auto-detect if a QZA file is provided instead of the unpackaged file. Deal with the converstions. Same for if a BIOM file is provided.
     
     command_line_args = parser.parse_args()

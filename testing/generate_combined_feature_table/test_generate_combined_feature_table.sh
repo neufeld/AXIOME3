@@ -135,6 +135,24 @@ cat "${output_dir}/${test_ID}.tsv" | md5sum > "${output_dir}/${test_ID}.tsv.md5"
 # Compare
 check_md5s "${test_ID}"
 
+## Test 4 - parsed taxonomy
+test_ID="04_parsed"
+echo "[ $(date -u) ]: Running script on test data '${test_ID}'"
+generate_combined_feature_table.py \
+  -f "${input_dir}/feature_table.tsv" \
+  -s "${input_dir}/representative_seqs.fasta" \
+  -t "${input_dir}/taxonomy.tsv" \
+  -o "${output_dir}/${test_ID}.tsv" \
+  -P \
+  > "${output_dir}/${test_ID}.log" 2>&1
+# TODO - print an error message if this fails
+
+# Generate MD5 hash on expected output
+cat "${output_dir}/${test_ID}.tsv" | md5sum > "${output_dir}/${test_ID}.tsv.md5"
+
+# Compare
+check_md5s "${test_ID}"
+
 ### Overall status
 if [[ "${FAILED_TESTS}" -eq 0 ]]; then
   echo "[ $(date -u) ]: All tests PASSED. Deleting output folder."
