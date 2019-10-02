@@ -119,7 +119,7 @@ If you don't run this command, any changes you made in .bashrc file will NOT tak
 
 There is a script that can make a manifest file given  
 a. SampleSheet (used for MiSeq), and  
-b. the directory that has sequence data (fastq.gz files)  
+b. the directory that has sequence data (fastq.gz files) (this will be the directory that stores MiSeq data)
 
 _You don't have to do this if you already have a manifest file_
 
@@ -131,7 +131,6 @@ You can use the script by running the command
 python scripts/generate_manifest.py \
 	--samplesheet <PATH TO SAMPLESHEET USED IN MISEQ> # It should ONLY have your samples \
 	--data-dir <PATH TO DIRECTORY THAT HAS SEQUENCE FILES>
-
 -------------------------------------------------
 - Actual Example -
 python scripts/generate_manifest.py \
@@ -179,7 +178,6 @@ python luigi_config_generator.py \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
 	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]> \
 	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
-	
 -----------------------------------------------------------------------------
 - Actual Example -
 
