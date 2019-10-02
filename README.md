@@ -121,9 +121,9 @@ There is a script that can make a manifest file given
 a. SampleSheet (used for MiSeq), and  
 b. the directory that has sequence data (fastq.gz files)  
 
-_You don't have to do this if you already a manifest file_
+_You don't have to do this if you already have a manifest file_
 
-_Skip to Running Pipeline Section if you already have manifest file_
+_Skip to Running Pipeline Section if you already have a manifest file_
 
 You can use the script by running the command  
 ```
