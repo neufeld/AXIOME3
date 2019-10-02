@@ -264,7 +264,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Creates a TSV-format QIIME2 feature table with overlaid taxonomy and sequence '
                                                    'information for convenience of viewing. '
-                                                   'Copyright Jackson M. Tsuji, Neufeld Research Group, 2019.')
+                                                   'Copyright Jackson M. Tsuji, Neufeld Research Group, 2019. '
+                                                   'Version: ' + SCRIPT_VERSION)
     parser.add_argument('-f', '--feature_table', required = True, 
                        help = 'The path to the input TSV feature table file.')
     parser.add_argument('-s', '--rep_seqs', required = False, default = False, 

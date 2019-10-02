@@ -90,7 +90,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Creates a tabular summary of the total read counts of all samples in a qiime2 feature table. "
-                                                   "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019.")
+                                                   "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019. "
+                                                   "Version: " + SCRIPT_VERSION)
     parser.add_argument('-i', '--input_filepath', metavar = 'input', required = True, 
                        help = 'The path to the input QZA FeatureTable file.')
     parser.add_argument('-o', '--output_filepath', metavar = 'output', required = True, 

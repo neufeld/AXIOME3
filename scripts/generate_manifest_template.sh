@@ -13,7 +13,7 @@ if [[ $# -lt 1 ]]; then
   exit 1
 elif [[ $1 = "-h" ]] || [[ $1 = "--help" ]]; then
   printf "${SCRIPT_NAME}: Creates a template manifest file for QIIME2 based on directory structure.\n"
-  printf "Version: ${SCRIPT_VERSION}"
+  printf "Version: ${SCRIPT_VERSION}\n"
   printf "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019\n\n"
   printf "Usage: ${SCRIPT_NAME} folder_1 folder_2 ... folder_N > manifest.tsv\n\n"
   printf "Note: log information is printed to STDERR.\n\n"

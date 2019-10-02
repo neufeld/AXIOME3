@@ -58,7 +58,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Simple script to split a QIIME2 manifest file into multiple files based on the run_ID column. "
-                                                   "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019.")
+                                                   "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019. "
+                                                   "Version: " + SCRIPT_VERSION)
     parser.add_argument('-i', '--input_filepath', metavar = 'input', required = True,
                        help = 'The path to the input manifest file. Must match QIIME standards AND have a column named "run_ID" with a unique ID for each Illumina run')
     parser.add_argument('-o', '--output_dir', metavar = 'output', required = True,
