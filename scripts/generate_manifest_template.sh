@@ -5,6 +5,7 @@
 # Part of the AXIOME3 project
 
 SCRIPT_NAME=${0##*/}
+SCRIPT_VERSION="0.8.0"
 
 # Print help statement
 if [[ $# -lt 1 ]]; then
@@ -12,6 +13,7 @@ if [[ $# -lt 1 ]]; then
   exit 1
 elif [[ $1 = "-h" ]] || [[ $1 = "--help" ]]; then
   printf "${SCRIPT_NAME}: Creates a template manifest file for QIIME2 based on directory structure.\n"
+  printf "Version: ${SCRIPT_VERSION}"
   printf "Copyright Jackson M. Tsuji, Neufeld Research Group, 2019\n\n"
   printf "Usage: ${SCRIPT_NAME} folder_1 folder_2 ... folder_N > manifest.tsv\n\n"
   printf "Note: log information is printed to STDERR.\n\n"
@@ -24,6 +26,7 @@ input_dirs=(${@})
 
 # Startup message
 echo "[ $(date -u) ]: Running ${SCRIPT_NAME}" >&2
+echo "[ $(date -u) ]: Version: ${SCRIPT_VERSION}" >&2
 echo "[ $(date -u) ]: Command: ${SCRIPT_NAME} ${@}" >&2
 echo "[ $(date -u) ]: Parsing samples from ${#input_dirs[@]} input directories" >&2
 

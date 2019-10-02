@@ -12,6 +12,9 @@ import argparse
 
 import pandas as pd
 
+# GLOBAL VARIABLES
+SCRIPT_VERSION = '0.8.0'
+
 # Set up the logger
 logging.basicConfig(level=logging.INFO, format="[ %(asctime)s UTC ]: %(levelname)s: %(module)s: %(message)s")
 logging.Formatter.converter = time.gmtime
@@ -24,6 +27,7 @@ def main(args):
     
     # Startup messages
     logger.info("Running " + os.path.basename(sys.argv[0]))
+    logger.info("Version: " + SCRIPT_VERSION)
     logger.info("Input filepath: " + input_filepath)
     logger.info("Output directory: " + output_dir)
 

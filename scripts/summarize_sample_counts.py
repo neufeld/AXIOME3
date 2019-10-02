@@ -16,6 +16,7 @@ import zipfile as zf
 import pandas as pd
 
 # GLOBAL variables
+SCRIPT_VERSION = '0.8.0'
 BIOM_PATH_PARTIAL = 'data/feature-table.biom' # biom file location within the unzipped QZA file
 
 # Set up the logger
@@ -31,6 +32,7 @@ def main(args):
 
     # Startup messages
     logger.info("Running " + os.path.basename(sys.argv[0]))
+    logger.info("Version: " + SCRIPT_VERSION)
     logger.info("Input filepath: " + input_filepath)
     logger.info("Output directory: " + output_filepath)
     logger.info("Min count filepath: " + str(min_count_filepath))

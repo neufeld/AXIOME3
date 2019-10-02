@@ -14,6 +14,9 @@ import re
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
 
+# GLOBAL VARIABLES
+SCRIPT_VERSION = '0.8.0'
+
 # Set up the logger
 logging.basicConfig(level=logging.INFO, format='[ %(asctime)s UTC ]: %(levelname)s: %(module)s: %(message)s')
 logging.Formatter.converter = time.gmtime
@@ -199,6 +202,8 @@ def main(args):
 
     # Startup messages
     logger.info('Running ' + os.path.basename(sys.argv[0]))
+    logger.info('Version: ' + SCRIPT_VERSION)
+    logger.info('### SETTINGS ###')
     logger.info('Feature table filepath: ' + feature_table_filepath)
     logger.info('Representative sequences filepath: ' + str(rep_seq_filepath))
     logger.info('Taxonomy filepath: ' + str(taxonomy_filepath))
@@ -206,6 +211,7 @@ def main(args):
     logger.info('Sort Feature IDs roughly by relative abundance?: ' + str(sort_features))
     logger.info('Rename Feature IDs sequentially?: ' + str(rename_features))
     logger.info('Parse Silva taxonomy into 7 ranks?: ' + str(parse_taxonomy))
+    logger.info('################')
 
     # Load the feature table
     logger.info('Loading feature table')
