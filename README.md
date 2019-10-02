@@ -115,7 +115,57 @@ If you don't run this command, any changes you made in .bashrc file will NOT tak
 
 ## Usage
 
-### For people who are not comfortable with linux terminal
+### Generating Manifest file
+
+There is a script that can make a manifest file given  
+a. SampleSheet (used for MiSeq), and  
+b. the directory that has sequence data (fastq.gz files)  
+
+_You don't have to do this if you already a manifest file_
+
+_Skip to Running Pipeline Section if you already have manifest file_
+
+You can use the script by running the command  
+```
+- General Format -
+python scripts/generate_manifest.py \
+	--samplesheet <PATH TO SAMPLESHEET USED IN MISEQ> # It should ONLY have your samples \
+	--data-dir <PATH TO DIRECTORY THAT HAS SEQUENCE FILES>
+
+-------------------------------------------------
+- Actual Example -
+python scripts/generate_manifest.py \
+	--samplesheet ~/manifest_test/SampleSheetCorrected160713.csv \
+	--data-dir  ~/manifest_test
+```
+
+#### VERY IMPORTANT
+
+**Samplesheet should only have your samples. If your samplesheet has samples owned by multiple people (i.e. you ran MiSeq with other people), you MUST change the original samplesheet so that it will only have your samples**
+
+For example, in the following samplesheet,
+
+```
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+DD11,11,nested,A11,V4-R9,GATCAG,Pro341Fi4,AAGGCC,,
+DD12,12,1,A12,V4-R17,TCCTCA,Pro341Fi4,AAGGCC,,
+DD13,13,1,B1,V4-R2,CGATGT,Pro341Fi1,TCTCGG,,
+DD14,14,1,B2,V4-R10,TAGCTT,Pro341Fi1,TCTCGG,,
+DD15,15,1,B3,V4-R18,GGTTGT,Pro341Fi1,TCTCGG,,
+```
+
+If DD11 and DD12 are not your samples, remove these two lines from the samplesheet like so.
+
+```
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+DD13,13,1,B1,V4-R2,CGATGT,Pro341Fi1,TCTCGG,,
+DD14,14,1,B2,V4-R10,TAGCTT,Pro341Fi1,TCTCGG,,
+DD15,15,1,B3,V4-R18,GGTTGT,Pro341Fi1,TCTCGG,,
+```
+
+### Running Pipeline
+
+#### For people who are not comfortable with linux terminal
 
 0. Activate conda environment and cd to Neufeld-16S-Pipeline (if you haven't already done so).
 
@@ -291,14 +341,14 @@ _if you don't see the above message (notice the smiley face, ":)"), or your outp
 
 **by default, luigi pipeline looks at "output" directory to check for successful tasks, so if all the files already exist in this directory (e.g. from analyzing your previous samples), it will think there aren't any jobs to be run for the new samples since all the files are there.**
 
-#### Moving directory example
+##### Moving directory example
 Let's say you want to move "output" directory to "Analysis" directory under the home directory, and rename it to "Illumina_Run3".
 
 You may run the command below to do so.
 
 `mv output ~/Analysis/Illumina_Run3` ("~" means home directory fyi)
 
-### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
+#### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
 
 1. Change directory to "configuration directory".
 
