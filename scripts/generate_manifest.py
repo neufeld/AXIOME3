@@ -91,18 +91,11 @@ def read_samplesheet(samplesheet_path):
 
     return processed_data
 
-def generate_manifest(samplesheet_processed, data_dir):
+def generate_manifest(samplesheet_processed, data_dir, formatters):
     """
     Generate manifest file based on the provided samplesheet, and Illumina
     MiSeq Data
     """
-
-    # Color formatter
-    formatters = {
-            'RED': '\033[91m',
-            'GREEN': '\033[92m',
-            'END': '\033[0m'
-            }
 
     manifest_lines = []
     excluded_files = []
@@ -176,15 +169,38 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Colour formatters
+    formatters = {
+            'RED': '\033[91m',
+            'GREEN': '\033[92m',
+            'REVERSE': '\033[7m',
+            'END': '\033[0m'
+            }
+
     # Read Samplesheet.csv
     samplesheet_processed = read_samplesheet(args.samplesheet)
 
     # Get manifest file content
-    manifest_lines = generate_manifest(samplesheet_processed, args.data_dir)
+    manifest_lines = generate_manifest(
+            samplesheet_processed,
+            args.data_dir,
+            formatters)
+
+    sorted_manifest = sorted(manifest_lines,
+            key=lambda x:
+                (natural_sort_key(x.split(',')[0]),
+                x.split(',')[2]))
 
     # Write output
     with open("manifest.txt", 'w') as fh:
         # Write header
         fh.write("sample-id,absolute-filepath,direction\n")
-        fh.write('\n'.join(sorted(manifest_lines, key = lambda x:
-            natural_sort_key(x.split(',')[0]))))
+        fh.write('\n'.join(sorted_manifest))
+
+    print("Generated manifest.txt in the current directory!\n" +\
+            "Full path to the generated manifest file: " +\
+            "{REVERSE}{manifest_path}{END}\n".format(
+                    manifest_path = os.path.abspath("manifest.txt"),
+                    REVERSE=formatters['REVERSE'],
+                    END=formatters['END']
+                ))
