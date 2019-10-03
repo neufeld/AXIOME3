@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import sys
 import os
+import glob
 import re
 
 def args_parse():
@@ -99,6 +100,10 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
 
     manifest_lines = []
     excluded_files = []
+    # Remove element whenever it's "processed"
+    # Shallow copy is fine since it's not nested dictionary
+    excluded_sample_dict = samplesheet_processed.copy()
+
     for f in os.listdir(data_dir):
         # Fastq files are gunzipped (has a format *.fastq.gz)
         if f.endswith(".fastq.gz"):
@@ -137,25 +142,65 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
             manifest_line = ','.join([sample_id, abspath, direction])
             manifest_lines.append(manifest_line)
 
-    formatted_files = ''
-    colwidth = max(len(f) for f in excluded_files) + 3
-    column = 4
-    count = 0
-    for f in sorted(excluded_files, key=natural_sort_key):
-        if(count % column == 0 and count != 0):
-            formatted_files = '\n'.join([formatted_files, f.ljust(colwidth)])
-        else:
-            formatted_files = ''.join([formatted_files, f.ljust(colwidth)])
+            # Remove dictionary key when it's done processing
+            excluded_sample_dict.pop(sample_name, None)
 
-        count = count + 1
 
-    warning_msg = "{RED}WARNING!\n{END}".format(**formatters) +\
-            "Excluding following files in the manifest file because " +\
-            "corresponding Sample_Name could not be found in the provided" +\
-            " SampleSheet.\n\n" +\
-            "{files}\n".format(files=formatted_files)
+    # Print files that are present in the directory, but not in the samplesheet
+    if(excluded_files):
+        formatted_excluded_files = ''
+        colwidth = max(len(f) for f in excluded_files) + 3
+        column = 4
+        count = 0
+        for f in sorted(excluded_files, key=natural_sort_key):
+            if(count % column == 0 and count != 0):
+                formatted_excluded_files = '\n'.join([formatted_excluded_files, f.ljust(colwidth)])
+            else:
+                formatted_excluded_files = ''.join([formatted_excluded_files, f.ljust(colwidth)])
 
-    print(warning_msg)
+            count = count + 1
+
+        warning_msg = "{RED}WARNING!\n{END}".format(**formatters) +\
+                "Excluding following files in the manifest file because " +\
+                "{UNDERLINE}corresponding Sample_Name could not be found{END}".format(
+                        **formatters) +\
+                "{UNDERLINE} in the provided SampleSheet.{END}\n\n".format(
+                        **formatters) +\
+                "{files}\n".format(files=formatted_excluded_files)
+
+        print(warning_msg)
+
+    # Print files that are present in the samplesheet, but not in the directory
+    if(excluded_sample_dict):
+        # Construct file names based on Sample_Name
+        missing_files = []
+        for s_name in excluded_sample_dict:
+            #do something
+            missing_forward = s_name + "_S100_L001_R1_001.fastq.gz"
+            missing_reverse = s_name + "_S100_L001_R2_001.fastq.gz"
+
+            missing_files.append(missing_forward)
+            missing_files.append(missing_reverse)
+
+        formatted_missing_files = ''
+        colwidth = max(len(f) for f in missing_files) + 3
+        column = 4
+        count = 0
+        for f in sorted(missing_files, key=natural_sort_key):
+            if(count % column == 0 and count != 0):
+                formatted_missing_files = '\n'.join([formatted_missing_files, f.ljust(colwidth)])
+            else:
+                formatted_missing_files = ''.join([formatted_missing_files, f.ljust(colwidth)])
+
+            count = count + 1
+
+        warning_msg = "{RED}WARNING!\n{END}".format(**formatters) +\
+                "Following files are found in the samplesheet, " +\
+                "{UNDERLINE}but NOT in the specified --data-dir{END}\n\n".format(
+                        **formatters) +\
+                "{files}\n".format(files=formatted_missing_files)
+
+        print(warning_msg)
 
     return manifest_lines
 
@@ -174,6 +219,7 @@ if __name__ == "__main__":
             'RED': '\033[91m',
             'GREEN': '\033[92m',
             'REVERSE': '\033[7m',
+            'UNDERLINE': '\033[4m',
             'END': '\033[0m'
             }
 
@@ -197,6 +243,7 @@ if __name__ == "__main__":
         fh.write("sample-id,absolute-filepath,direction\n")
         fh.write('\n'.join(sorted_manifest))
 
+    print("--------------------------------------------------")
     print("Generated manifest.txt in the current directory!\n" +\
             "Full path to the generated manifest file: " +\
             "{REVERSE}{manifest_path}{END}\n".format(
