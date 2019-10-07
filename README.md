@@ -8,7 +8,7 @@ Currently, it uses conda 4.7.12 and qiime2 version 2019-07
 **Note that previous versions of conda may cause problems**
 
 ## Required packages
-**conda 4.7.12 or later** (No guarantee previous versions of conda will work!)  
+**conda 4.7.12 or newer** (No guarantee previous versions of conda will work!)  
 **qiime2 (tested with 2019-04 and 2019-07)**
 
 Refer to 16S-luigi.yml file for details.
