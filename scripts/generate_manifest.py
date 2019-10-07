@@ -122,7 +122,8 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
                 continue
             sample_id = samplesheet_processed[sample_name]
 
-            abspath = os.path.abspath(f)
+            #abspath = os.path.abspath(f)
+            abspath = os.path.join(data_dir, f)
 
             # Case 1: Forward read
             # Has "R1" in the file name
