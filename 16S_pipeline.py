@@ -1,7 +1,8 @@
 import luigi
 import os
 import sys
-from subprocess import check_output, CalledProcessError
+#from subprocess import check_output, CalledProcessError
+import subprocess
 import logging
 
 # Define custom logger
@@ -10,23 +11,53 @@ logger = logging.getLogger("custom logger")
 # Path to configuration file to be used
 luigi.configuration.add_config_path("configuration/luigi.cfg")
 
-def run_cmd(cmd, step):
-    try:
-        output = check_output(cmd)
-    except CalledProcessError as err:
-        logger.error("In {step} following error occured\n{err}".format(
-            step=step,
-            err=err
-            ))
-        sys.exit(1)
-    except Exception as err:
-        logger.error("In {step} unknown error occured\n{err}".format(
-            step=step,
-            err=err
-            ))
-        raise err
+# Color formatter
+formatters = {
+        'RED': '\033[91m',
+        'GREEN': '\033[92m',
+        'END': '\033[0m'
+        }
 
-    return output
+def run_cmd(cmd, step):
+    #try:
+    #    output = check_output(cmd)
+    #except CalledProcessError as err:
+    #    logger.error("In {step} following error occured\n{err}".format(
+    #        step=step,
+    #        err=err
+    #        ))
+    #    raise err
+    #except Exception as err:
+    #    logger.error("In {step} unknown error occured\n{err}".format(
+    #        step=step,
+    #        err=err
+    #        ))
+    #    raise err
+    #finally:
+    #    logger.error(output)
+
+    proc = subprocess.Popen(cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+    )
+    stdout, stderr = proc.communicate()
+
+    return_code = proc.returncode
+
+    if not(return_code == 0):
+        combined_msg = (stdout + stderr).decode('utf-8')
+        err_msg = "In {step}, the following command, : ".format(step=step) + \
+                "{cmd}\n\n".format(cmd=cmd) + \
+                "resulted in an error:\n{RED}{combined_msg}{END}"\
+                        .format(combined_msg=combined_msg,
+                                RED=formatters['RED'],
+                                END=formatters['END'])
+
+
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+    else:
+        return stdout
 
 class Out_Prefix(luigi.Config):
     prefix = luigi.Parameter()
@@ -35,8 +66,10 @@ class Output_Dirs(luigi.Config):
     # Define output paths
     out_dir = Out_Prefix().prefix
     denoise_dir = os.path.join(out_dir, "dada2")
+    rarefy_dir = os.path.join(out_dir, "rarefy")
     taxonomy_dir = os.path.join(out_dir, "taxonomy")
     export_dir = os.path.join(out_dir, "exported")
+    rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
 
 class Samples(luigi.Config):
     """
@@ -217,6 +250,40 @@ class Denoise_Tabulate(luigi.Task):
 
         run_cmd(cmd, step)
 
+class Rarefy(luigi.Task):
+    sampling_depth = luigi.Parameter(default="10000")
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
+                "rarefied_table.qza")
+
+        return luigi.LocalTarget(rarefied_table)
+
+    def run(self):
+        step = str(self)
+
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                Output_Dirs().rarefy_dir],
+                step)
+
+        # Rarefy
+        cmd = ["qiime",
+                "feature-table",
+                "rarefy",
+                "--i-table",
+                self.input()['table'].path,
+                "--p-sampling-depth",
+                self.sampling_depth,
+                "--o-rarefied-table",
+                self.output().path
+                ]
+        run_cmd(cmd, step)
+
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
     n_jobs = luigi.Parameter(default="10")
@@ -323,6 +390,35 @@ class Export_Feature_Table(luigi.Task):
 
         run_cmd(cmd, step)
 
+class Export_Rarefy_Feature_Table(luigi.Task):
+
+    def requires(self):
+        return Rarefy()
+
+    def output(self):
+        rarefied_biom = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.biom")
+
+        return luigi.LocalTarget(rarefied_biom)
+
+    def run(self):
+        step = str(self)
+        # Make directory
+        run_cmd(["mkdir",
+                "-p",
+                Output_Dirs().rarefy_export_dir],
+                step)
+
+        # Export file
+        cmd = ["qiime",
+                "tools",
+                "export",
+                "--input-path",
+                self.input().path,
+                "--output-path",
+                os.path.dirname(self.output().path)]
+
+        run_cmd(cmd, step)
+
 class Export_Taxonomy(luigi.Task):
 
     def requires(self):
@@ -410,22 +506,60 @@ class Convert_Biom_to_TSV(luigi.Task):
 
         run_cmd(cmd, step)
 
+class Convert_Rarefy_Biom_to_TSV(luigi.Task):
+
+    def requires(self):
+        return Export_Rarefy_Feature_Table()
+
+    def output(self):
+        tsv = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.tsv")
+
+        return luigi.LocalTarget(tsv)
+
+    def run(self):
+        step = str(self)
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                Output_Dirs().rarefy_export_dir],
+                step)
+
+        # Convert to TSV
+        cmd = ["biom",
+                "convert",
+                "-i",
+                self.input().path,
+                "-o",
+                self.output().path,
+                "--to-tsv"]
+
+        run_cmd(cmd, step)
+
 class Generate_Combined_Feature_Table(luigi.Task):
 
     def requires(self):
         return {
                 "Export_Taxonomy": Export_Taxonomy(),
                 "Export_Representative_Seqs": Export_Representative_Seqs(),
-                "Convert_Biom_to_TSV": Convert_Biom_to_TSV()
+                "Convert_Biom_to_TSV": Convert_Biom_to_TSV(),
+                "Convert_Rarefy_Biom_to_TSV": Convert_Rarefy_Biom_to_TSV()
                 }
 
     def output(self):
         combined_table = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.tsv")
         log = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.log")
 
+        combined_rarefied_table = os.path.join(Output_Dirs().rarefy_export_dir,
+                "ASV_rarefied_table_combined.tsv")
+        rarefied_log = os.path.join(Output_Dirs().rarefy_export_dir,
+                "ASV_rarefied_table_combined.log")
+
         output = {
                 "table": luigi.LocalTarget(combined_table),
-                "log": luigi.LocalTarget(log, format=luigi.format.Nop)
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                "rarefied_table": luigi.LocalTarget(combined_rarefied_table),
+                "rarefied_log": luigi.LocalTarget(rarefied_log,
+                    format=luigi.format.Nop)
                 }
 
         return output
@@ -439,8 +573,8 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 Output_Dirs().export_dir],
                 step)
 
-        # Run Jackson's script
-        cmd = ["generate_combined_feature_table.py",
+        # Run Jackson's script on pre-rarefied table
+        cmd_pre_rarefied = ["generate_combined_feature_table.py",
                 "-f",
                 self.input()["Convert_Biom_to_TSV"].path,
                 "-s",
@@ -450,11 +584,27 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 "-o",
                 self.output()["table"].path]
 
-        logged = run_cmd(cmd, step)
+        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, step)
 
-        # Write a log file
+        # Run Jackson's script on rarefied table
+        cmd_rarefied = ["generate_combined_feature_table.py",
+                "-f",
+                self.input()["Convert_Rarefy_Biom_to_TSV"].path,
+                "-s",
+                self.input()["Export_Representative_Seqs"].path,
+                "-t",
+                self.input()["Export_Taxonomy"].path,
+                "-o",
+                self.output()["rarefied_table"].path]
+
+        logged_rarefied = run_cmd(cmd_rarefied, step)
+
+        # Write log files
         with self.output()["log"].open('w') as fh:
-            fh.write(logged)
+            fh.write(logged_pre_rarefied)
+
+        with self.output()["rarefied_log"].open('w') as fh:
+            fh.write(logged_rarefied)
 
 
 class Run_All(luigi.Task):
@@ -464,12 +614,15 @@ class Run_All(luigi.Task):
                 Summarize(),
                 Denoise(),
                 Denoise_Tabulate(),
+                Rarefy(),
                 Taxonomic_Classification(),
                 Taxonomy_Tabulate(),
                 Export_Feature_Table(),
+                Export_Rarefy_Feature_Table(),
                 Export_Taxonomy(),
                 Export_Representative_Seqs(),
                 Convert_Biom_to_TSV(),
+                Convert_Rarefy_Biom_to_TSV(),
                 Generate_Combined_Feature_Table()
                 ]
 
