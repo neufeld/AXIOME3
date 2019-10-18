@@ -96,6 +96,15 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
     """
     Generate manifest file based on the provided samplesheet, and Illumina
     MiSeq Data
+
+    Arguments
+        - samplesheet_processed: dictionary {sample_name: sample_id} as described
+        in the samplesheet
+        - data_dir: directory containing all the MiSeq samples
+        - formatters: color formatters for print
+
+    Return
+        - Manifest file content as a string
     """
 
     manifest_lines = []
@@ -175,9 +184,9 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
         # Construct file names based on Sample_Name
         missing_files = []
         for s_name in excluded_sample_dict:
-            #do something
-            missing_forward = s_name + "_S100_L001_R1_001.fastq.gz"
-            missing_reverse = s_name + "_S100_L001_R2_001.fastq.gz"
+            # Construct file name
+            missing_forward = s_name + "_S" + s_name + "_L001_R1_001.fastq.gz"
+            missing_reverse = s_name + "_S" + s_name + "_L001_R2_001.fastq.gz"
 
             missing_files.append(missing_forward)
             missing_files.append(missing_reverse)
