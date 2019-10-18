@@ -45,7 +45,7 @@ def main(args):
 
         # Find the path to the biom file
         # See https://stackoverflow.com/a/12845341 (accessed Sept. 12, 2019)
-        biom_filepath = filter(lambda x: BIOM_PATH_PARTIAL in x, qza_data_contents)
+        biom_filepath = list(filter(lambda x: BIOM_PATH_PARTIAL in x, qza_data_contents))
         # TODO - check this is a list of length 1
         logger.debug("Found biom file in QZA file at " + str(biom_filepath[0]))
         
