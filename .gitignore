@@ -1,2 +1,6 @@
 luigi.cfg
 output
+tmp_output
+soft_threshold.py
+manifest.txt
+__pycache__

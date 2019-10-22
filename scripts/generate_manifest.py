@@ -4,6 +4,15 @@ import os
 import glob
 import re
 
+# Colour formatters
+formatters = {
+        'RED': '\033[91m',
+        'GREEN': '\033[92m',
+        'REVERSE': '\033[7m',
+        'UNDERLINE': '\033[4m',
+        'END': '\033[0m'
+        }
+
 def args_parse():
     """
     Parse command line arguments into Python
@@ -46,6 +55,10 @@ def read_samplesheet(samplesheet_path):
     {sample_Name: sample_ID}
     """
 
+    # Check if file exists
+    if not(os.path.isfile(samplesheet_path)):
+        raise FileNotFoundError("Specified samplesheet does NOT exist...\n")
+
     # Preset header in samplesheet
     # Assume this will always exist in every samplesheet
     header = "Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID," +\
@@ -86,13 +99,11 @@ def read_samplesheet(samplesheet_path):
                 processed_data[sample_name] = sample_id
 
     if(len(processed_data) == 0):
-        print("ERROR!\n")
-        print("Samplesheet has zero samples\n")
-        sys.exit(1)
+        raise ValueError("Samplesheet has zero samples\n")
 
     return processed_data
 
-def generate_manifest(samplesheet_processed, data_dir, formatters):
+def generate_manifest(samplesheet_processed, data_dir):
     """
     Generate manifest file based on the provided samplesheet, and Illumina
     MiSeq Data
@@ -106,6 +117,10 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
     Return
         - Manifest file content as a string
     """
+
+    # Check data_dir exist
+    if not(os.path.isdir(data_dir)):
+        raise FileNotFoundError("Specified data_dir does NOT exist...\n")
 
     manifest_lines = []
     excluded_files = []
@@ -180,9 +195,9 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
         print(warning_msg)
 
     # Print files that are present in the samplesheet, but not in the directory
+    missing_files = []
     if(excluded_sample_dict):
         # Construct file names based on Sample_Name
-        missing_files = []
         for s_name in excluded_sample_dict:
             # Construct file name
             missing_forward = s_name + "_S" + s_name + "_L001_R1_001.fastq.gz"
@@ -211,7 +226,7 @@ def generate_manifest(samplesheet_processed, data_dir, formatters):
 
         print(warning_msg)
 
-    return manifest_lines
+    return manifest_lines, excluded_files, missing_files
 
 if __name__ == "__main__":
     parser = args_parse()
@@ -223,20 +238,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Colour formatters
-    formatters = {
-            'RED': '\033[91m',
-            'GREEN': '\033[92m',
-            'REVERSE': '\033[7m',
-            'UNDERLINE': '\033[4m',
-            'END': '\033[0m'
-            }
-
     # Read Samplesheet.csv
     samplesheet_processed = read_samplesheet(args.samplesheet)
 
     # Get manifest file content
-    manifest_lines = generate_manifest(
+    manifest_lines, _, _ = generate_manifest(
             samplesheet_processed,
             args.data_dir,
             formatters)
