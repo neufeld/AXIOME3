@@ -54,21 +54,6 @@ class Check_Manifest(unittest.TestCase):
             Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
             """).strip()
 
-    def setUp(self):
-        self.samplesheet = "samplesheet.csv"
-        self.data_dir = "data"
-        self.fake_samplesheet = "fake.csv"
-        self.fake_data_dir = "fake_data"
-
-        if(os.path.exists(self.samplesheet)):
-            os.remove(self.samplesheet)
-        if(os.path.isdir(self.data_dir)):
-            shutil.rmtree(self.data_dir)
-        if(os.path.exists(self.fake_samplesheet)):
-            os.remove(self.fake_samplesheet)
-        if(os.path.isdir(self.fake_data_dir)):
-            shutil.rmtree(self.fake_data_dir)
-
     @mock.patch("generate_manifest.os.path")
     def test_samplesheet(self, mock_path):
         mock_path.isfile.return_value = False
