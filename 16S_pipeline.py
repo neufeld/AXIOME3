@@ -70,6 +70,7 @@ class Output_Dirs(luigi.Config):
     taxonomy_dir = os.path.join(out_dir, "taxonomy")
     export_dir = os.path.join(out_dir, "exported")
     rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
+    phylogeny_dir = os.path.join(out_dir, "phylogeny")
 
 class Samples(luigi.Config):
     """
@@ -606,6 +607,56 @@ class Generate_Combined_Feature_Table(luigi.Task):
         with self.output()["rarefied_log"].open('w') as fh:
             fh.write(logged_rarefied)
 
+# Post Analysis
+class Phylogeny_Tree(luigi.Task):
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        alignment = os.path.join(Output_Dirs().phylogeny_dir,
+                "aligned_rep_seqs.qza")
+        masked_alignment = os.path.join(Output_Dirs().phylogeny_dir,
+                "masked_aligned_rep_seqs.qza")
+        tree = os.path.join(Output_Dirs().phylogeny_dir,
+                "unrooted_tree.qza")
+        rooted_tree = os.path.join(Output_Dirs().phylogeny_dir,
+                "rooted_tree.qza")
+
+        out = {
+            'alignment': luigi.LocalTarget(alignment),
+            'masked_alignment': luigi.LocalTarget(masked_alignment),
+            'tree': luigi.LocalTarget(tree),
+            'rooted_tree': luigi.LocalTarget(rooted_tree),
+        }
+
+        return out
+
+    def run(self):
+        step = str(self)
+
+        # Create output directory
+        run_cmd(['mkdir',
+                '-p',
+                Output_Dirs().phylogeny_dir], step)
+
+        # Make phylogeny tree
+        cmd = ['qiime',
+                'phylogeny',
+                'align-to-tree-mafft-fasttree',
+                '--i-sequences',
+                self.input()['rep_seqs'].path,
+                '--o-alignment',
+                self.output()['alignment'].path,
+                '--o-masked-alignment',
+                self.output()['masked_alignment'].path,
+                '--o-tree',
+                self.output()['tree'].path,
+                '--o-rooted-tree',
+                self.output()['rooted_tree'].path
+        ]
+
+        run_cmd(cmd, step)
 
 class Run_All(luigi.Task):
     def requires(self):
