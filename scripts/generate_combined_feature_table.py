@@ -15,10 +15,10 @@ from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
 
 # GLOBAL VARIABLES
-SCRIPT_VERSION = '0.8.0'
+SCRIPT_VERSION = '0.8.1'
 
 # Set up the logger
-logging.basicConfig(level=logging.INFO, format='[ %(asctime)s UTC ]: %(levelname)s: %(module)s: %(message)s')
+logging.basicConfig(format='[ %(asctime)s UTC ]: %(levelname)s: %(message)s')
 logging.Formatter.converter = time.gmtime
 logger = logging.getLogger(__name__)
 
@@ -190,6 +190,13 @@ def main(args):
     sort_features = args.sort_features
     rename_features = args.rename_features
     parse_taxonomy = args.parse_taxonomy
+    verbose = args.verbose
+
+    # Set logger verbosity
+    if verbose is True:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
 
     # Set sort_features to True if rename_features is True
     if rename_features is True:
@@ -256,8 +263,13 @@ def main(args):
         feature_table = feature_table.rename(columns = {'Feature ID': feature_id_colname})
 
     # Write output
-    logger.info('Writing merged table to ' + output_filepath)
-    pd.DataFrame.to_csv(feature_table, output_filepath, sep = '\t', index = False)
+    if output_filepath == '-':
+        # Write to STDOUT
+        logger.info("Writing merged table to STDOUT")
+        feature_table.to_csv(sys.stdout, sep = '\t', index = False)
+    else:
+        logger.info('Writing merged table to ' + output_filepath)
+        feature_table.to_csv(output_filepath, sep = '\t', index = False)
 
     logger.info(os.path.basename(sys.argv[0]) + ': done.')
 
@@ -274,8 +286,8 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--taxonomy', required = False, default = False, 
                        help = 'The path to the input taxonomy file. Taxonomy will be added as the "Consensus.Lineage" column. '
                        'You can optionally omit this flag and not have taxonomy added to the table.')
-    parser.add_argument('-o', '--output_feature_table', required = True, 
-                       help = 'The path to the output TSV feature table.')
+    parser.add_argument('-o', '--output_feature_table', required = False, default = '-',
+                       help = 'The path to the output TSV feature table. Will write to STDOUT (-) if nothing is provided.')
     parser.add_argument('-N', '--feature_id_colname', required = False, default = 'Feature ID', 
                        help = 'The name of the first column of the output ASV table. [Default: "Feature ID"]')
     parser.add_argument('-S', '--sort_features', required = False, action = 'store_true', 
@@ -285,6 +297,8 @@ if __name__ == '__main__':
                        'Automatically sets --sort_features')
     parser.add_argument('-P', '--parse_taxonomy', required=False, action='store_true',
                         help= 'Optionally parse Silva taxonomy into 7 ranks with columns "domain", "phylum", etc.')
+    parser.add_argument('-v', '--verbose', required=False, action='store_true',
+                       help = 'Enable for verbose logging.')
     # TODO - add option to auto-detect if a QZA file is provided instead of the unpackaged file. Deal with the converstions. Same for if a BIOM file is provided.
     
     command_line_args = parser.parse_args()
