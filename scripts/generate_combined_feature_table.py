@@ -218,6 +218,7 @@ def main(args):
     logger.info('Sort Feature IDs roughly by relative abundance?: ' + str(sort_features))
     logger.info('Rename Feature IDs sequentially?: ' + str(rename_features))
     logger.info('Parse Silva taxonomy into 7 ranks?: ' + str(parse_taxonomy))
+    logger.info('Verbose logging: ' + str(verbose))
     logger.info('################')
 
     # Load the feature table

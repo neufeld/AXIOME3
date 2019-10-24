@@ -123,10 +123,10 @@ test_ID="03_simple"
 echo "[ $(date -u) ]: Running script on test data '${test_ID}'"
 generate_combined_feature_table.py \
   -f "${input_dir}/feature_table.tsv" \
-  -o "${output_dir}/${test_ID}.tsv" \
   -N "#OTU ID" \
   -R \
-  > "${output_dir}/${test_ID}.log" 2>&1
+  > "${output_dir}/${test_ID}.tsv" \
+  2> "${output_dir}/${test_ID}.log"
 # TODO - print an error message if this fails
 
 # Generate MD5 hash on expected output
