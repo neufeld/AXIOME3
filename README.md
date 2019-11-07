@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Neufeld lab 16S RNA analysis pipeline
 
 ## About
