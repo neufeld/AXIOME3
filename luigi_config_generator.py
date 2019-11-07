@@ -23,6 +23,11 @@ def args_parse():
             Path to Manifest file (.txt) to be imported to qiime
             """,
             required=True)
+
+    parser.add_argument('--metadata', help="""
+            Path to Metadata file (.txt) to be imported to qiime
+            """)
+
     parser.add_argument('--sample-type', help="""
             The semantic type of the artifact that will be created upon
             importing.
@@ -102,6 +107,7 @@ def get_luigi_config(template, args):
     """
 
     config_data = template.replace("<MANIFEST_PATH>", args.manifest, 1)\
+                            .replace("<METADATA_PATH>", args.metadata, 1)\
                             .replace("<PREFIX>", args.out_prefix,1)\
                             .replace("<SAMPLE_TYPE>", args.sample_type, 1)\
                             .replace("<INPUT_FORMAT>", args.input_format, 1)\

@@ -71,6 +71,8 @@ class Output_Dirs(luigi.Config):
     export_dir = os.path.join(out_dir, "exported")
     rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
     phylogeny_dir = os.path.join(out_dir, "phylogeny")
+    core_metric_dir = os.path.join(out_dir, "core_div_phylogeny")
+    visualization_dir = os.path.join(out_dir, "visualization")
 
 class Samples(luigi.Config):
     """
@@ -80,6 +82,7 @@ class Samples(luigi.Config):
 
     """
     manifest_file = luigi.Parameter()
+    metadata_file = luigi.Parameter(default='')
 
 class Import_Data(luigi.Task):
     # Options for qiime tools import
@@ -221,36 +224,6 @@ class Denoise(luigi.Task):
         with self.output()["log"].open('wb') as fh:
             fh.write(output)
 
-class Denoise_Tabulate(luigi.Task):
-
-    def requires(self):
-        return Denoise()
-
-    def output(self):
-        denoise_tabulated = os.path.join(Output_Dirs().denoise_dir, "stats-dada2.qzv")
-
-        return luigi.LocalTarget(denoise_tabulated)
-
-    def run(self):
-        step = str(self)
-
-        # Make output directory
-        run_cmd(["mkdir",
-                "-p",
-                Output_Dirs().denoise_dir],
-                step)
-
-        # Run qiime metadata tabulate
-        cmd = ["qiime",
-                "metadata",
-                "tabulate",
-                "--m-input-file",
-                self.input()["stats"].path,
-                "--o-visualization",
-                self.output().path]
-
-        run_cmd(cmd, step)
-
 class Rarefy(luigi.Task):
     sampling_depth = luigi.Parameter(default="10000")
 
@@ -331,36 +304,6 @@ class Taxonomic_Classification(luigi.Task):
         # Log result
         with self.output()["log"].open('wb') as fh:
             fh.write(output)
-
-class Taxonomy_Tabulate(luigi.Task):
-
-    def requires(self):
-        return Taxonomic_Classification()
-
-    def output(self):
-        tabulated = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy.qzv")
-
-        return luigi.LocalTarget(tabulated)
-
-    def run(self):
-        step = str(self)
-
-        # Make output directory
-        run_cmd(["mkdir",
-                "-p",
-                Output_Dirs().taxonomy_dir],
-                step)
-
-        # Tabulate taxonomy classification result
-        cmd = ["qiime",
-                "metadata",
-                "tabulate",
-                "--m-input-file",
-                self.input()["taxonomy"].path,
-                "--o-visualization",
-                self.output().path]
-
-        run_cmd(cmd, step)
 
 class Export_Feature_Table(luigi.Task):
 
@@ -658,6 +601,271 @@ class Phylogeny_Tree(luigi.Task):
 
         run_cmd(cmd, step)
 
+class Core_Metrics_Phylogeny(luigi.Task):
+    sampling_depth = luigi.Parameter(default="10000")
+
+    def requires(self):
+        return {
+                'Denoise': Denoise(),
+                'Phylogeny_Tree': Phylogeny_Tree()
+                }
+
+    def output(self):
+        out_dir = Output_Dirs().core_metric_dir
+
+        rarefied_table = os.path.join(out_dir, "rarefied_table.qza")
+        faith_pd_vector = os.path.join(out_dir, "alpha_faith_pd.qza")
+        obs_otu_vector = os.path.join(out_dir, "alpha_observed_otus.qza")
+        shannon_vector = os.path.join(out_dir, "alpha_shannon.qza")
+        evenness_vector = os.path.join(out_dir, "alpha_evenness.qza")
+        unweighted_unifrac_dist_matrix = os.path.join(out_dir,
+                "unweighted_unifrac_distance.qza")
+        weighted_unifrac_dist_matrix = os.path.join(out_dir,
+                "weighted_unifrac_distance.qza")
+        jaccard_dist_matrix = os.path.join(out_dir, "jaccard_distance.qza")
+        bray_curtis_dist_matrix = os.path.join(out_dir,
+                "bray_curtis_distance.qza")
+        unweighted_unifrac_pcoa = os.path.join(out_dir,
+                "unweighted_unifrac_pcoa.qza")
+        weighted_unifrac_pcoa = os.path.join(out_dir,
+                "weighted_unifrac_pcoa.qza")
+        jaccard_pcoa = os.path.join(out_dir, "jaccard_pcoa.qza")
+        bray_curtis_pcoa = os.path.join(out_dir, "bray_curtis_pcoa.qza")
+        unweighted_unifrac_emperor = os.path.join(out_dir,
+                "unweighted_unifrac_emperor.qzv")
+        weighted_unifrac_emperor = os.path.join(out_dir,
+                "weighted_unifrac_emperor.qzv")
+        jaccard_emperor = os.path.join(out_dir, "jaccard_emperor.qzv")
+        bray_curtis_emperor = os.path.join(out_dir, "bray_curtis_emperor.qzv")
+
+        out = {
+            'rarefied_table': luigi.LocalTarget(rarefied_table),
+            'faith_pd_vector': luigi.LocalTarget(faith_pd_vector),
+            'obs_otu_vector': luigi.LocalTarget(obs_otu_vector),
+            'shannon_vector': luigi.LocalTarget(shannon_vector),
+            'evenness_vector': luigi.LocalTarget(evenness_vector),
+            'unweighted_unifrac_dist_matrix':
+                luigi.LocalTarget(unweighted_unifrac_dist_matrix),
+            'weighted_unifrac_dist_matrix':
+                luigi.LocalTarget(weighted_unifrac_dist_matrix),
+            'jaccard_dist_matrix': luigi.LocalTarget(jaccard_dist_matrix),
+            'bray_curtis_dist_matrix':
+                luigi.LocalTarget(bray_curtis_dist_matrix),
+            'unweighted_unifrac_pcoa':
+                luigi.LocalTarget(unweighted_unifrac_pcoa),
+            'weighted_unifrac_pcoa': luigi.LocalTarget(weighted_unifrac_pcoa),
+            'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa),
+            'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
+            'unweighted_unifrac_emperor':
+                luigi.LocalTarget(unweighted_unifrac_emperor),
+            'weighted_unifrac_emperor':
+                luigi.LocalTarget(weighted_unifrac_emperor),
+            'jaccard_emperor': luigi.LocalTarget(jaccard_emperor),
+            'bray_curtis_emperor': luigi.LocalTarget(bray_curtis_emperor)
+        }
+
+        return out
+
+    def run(self):
+        step = str(self)
+
+        # Create output directory
+        run_cmd(['mkdir',
+                '-p',
+                Output_Dirs().core_metric_dir],
+                step)
+
+        # Run core-metric-phylogenetic
+        cmd = [
+                'qiime',
+                'diversity',
+                'core-metrics-phylogenetic',
+                '--i-table',
+                self.input()['Denoise']['table'].path,
+                '--i-phylogeny',
+                self.input()['Phylogeny_Tree']['rooted_tree'].path,
+                '--p-sampling-depth',
+                self.sampling_depth,
+                '--o-rarefied-table',
+                self.output()['rarefied_table'].path,
+                '--o-faith-pd-vector',
+                self.output()['faith_pd_vector'].path,
+                '--o-observed-otus-vector',
+                self.output()['obs_otu_vector'].path,
+                '--o-shannon-vector',
+                self.output()['shannon_vector'].path,
+                '--o-evenness-vector',
+                self.output()['evenness_vector'].path,
+                '--o-unweighted-unifrac-distance-matrix',
+                self.output()['unweighted_unifrac_dist_matrix'].path,
+                '--o-weighted-unifrac-distance-matrix',
+                self.output()['weighted_unifrac_dist_matrix'].path,
+                '--o-jaccard-distance-matrix',
+                self.output()['jaccard_dist_matrix'].path,
+                '--o-bray-curtis-distance-matrix',
+                self.output()['bray_curtis_dist_matrix'].path,
+                '--o-unweighted-unifrac-pcoa-results',
+                self.output()['unweighted_unifrac_pcoa'].path,
+                '--o-weighted-unifrac-pcoa-results',
+                self.output()['weighted_unifrac_pcoa'].path,
+                '--o-jaccard-pcoa-results',
+                self.output()['jaccard_pcoa'].path,
+                '--o-bray-curtis-pcoa-results',
+                self.output()['bray_curtis_pcoa'].path,
+                '--o-unweighted-unifrac-emperor',
+                self.output()['unweighted_unifrac_emperor'].path,
+                '--o-weighted-unifrac-emperor',
+                self.output()['weighted_unifrac_emperor'].path,
+                '--o-jaccard-emperor',
+                self.output()['jaccard_emperor'].path,
+                '--o-bray-curtis-emperor',
+                self.output()['bray_curtis_emperor'].path
+        ]
+
+        # Add metadata information if present
+        metadata = Samples().metadata_file
+        if not(metadata == "<METADATA_PATH>" or
+                metadata == ""):
+            cmd.append('--m-metadata-file')
+            cmd.append(metadata)
+
+        run_cmd(cmd, step)
+
+# Visualizations
+class Denoise_Tabulate(luigi.Task):
+    out_dir = Output_Dirs().denoise_dir
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        denoise_tabulated = os.path.join(self.out_dir, "stats-dada2.qzv")
+
+        return luigi.LocalTarget(denoise_tabulated)
+
+    def run(self):
+        step = str(self)
+
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.out_dir],
+                step)
+
+        # Run qiime metadata tabulate
+        cmd = ["qiime",
+                "metadata",
+                "tabulate",
+                "--m-input-file",
+                self.input()["stats"].path,
+                "--o-visualization",
+                self.output().path]
+
+        run_cmd(cmd, step)
+
+class Sequence_Tabulate(luigi.Task):
+    out_dir = Output_Dirs().denoise_dir
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        sequence_tabulated = os.path.join(self.out_dir, "dada2_rep_seqs.qzv")
+
+        return luigi.LocalTarget(sequence_tabulated)
+
+    def run(self):
+        step = str(self)
+
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.out_dir],
+                step)
+
+        # Run qiime metadata tabulate
+        cmd = ["qiime",
+                "feature-table",
+                "tabulate-seqs",
+                "--i-data",
+                self.input()["rep_seqs"].path,
+                "--o-visualization",
+                self.output().path]
+
+        run_cmd(cmd, step)
+
+class Taxonomy_Tabulate(luigi.Task):
+    out_dir = Output_Dirs().taxonomy_dir
+
+    def requires(self):
+        return Taxonomic_Classification()
+
+    def output(self):
+        tabulated = os.path.join(self.out_dir, "taxonomy.qzv")
+
+        return luigi.LocalTarget(tabulated)
+
+    def run(self):
+        step = str(self)
+
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.out_dir],
+                step)
+
+        # Tabulate taxonomy classification result
+        cmd = ["qiime",
+                "metadata",
+                "tabulate",
+                "--m-input-file",
+                self.input()["taxonomy"].path,
+                "--o-visualization",
+                self.output().path]
+
+        run_cmd(cmd, step)
+
+class Rarefaction_Curves(luigi.Task):
+    max_depth = luigi.Parameter(default="10000")
+    out_dir = Output_Dirs().visualization_dir
+
+    def requires(self):
+        return {
+                'Denoise': Denoise(),
+                'Phylogeny_Tree': Phylogeny_Tree()
+                }
+
+    def output(self):
+        alpha_rarefaction = os.path.join(self.out_dir,
+                "alpha_rarefaction_" + self.max_depth + ".qzv")
+
+        return luigi.LocalTarget(alpha_rarefaction)
+
+    def run(self):
+        step = str(self)
+        # Make directory
+        run_cmd(['mkdir',
+                '-p',
+                self.out_dir],
+                step)
+
+        # Make alpha rarefaction curve
+        cmd = [
+                'qiime',
+                'diversity',
+                'alpha-rarefaction',
+                '--i-table',
+                self.input()['Denoise']['table'].path,
+                '--i-phylogeny',
+                self.input()['Phylogeny_Tree']['rooted_tree'].path,
+                '--p-max-depth',
+                self.max_depth,
+                '--o-visualization',
+                self.output().path
+                ]
+
+        run_cmd(cmd, step)
+
 class Run_All(luigi.Task):
     def requires(self):
         return [
@@ -674,7 +882,8 @@ class Run_All(luigi.Task):
                 Export_Representative_Seqs(),
                 Convert_Biom_to_TSV(),
                 Convert_Rarefy_Biom_to_TSV(),
-                Generate_Combined_Feature_Table()
+                Generate_Combined_Feature_Table(),
+                Core_Metrics_Phylogeny()
                 ]
 
 if __name__ == '__main__':

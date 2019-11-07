@@ -3,4 +3,5 @@ output
 tmp_output
 soft_threshold.py
 manifest.txt
+inputs
 __pycache__
