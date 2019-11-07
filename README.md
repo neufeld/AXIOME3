@@ -1,16 +1,17 @@
-<<<<<<< HEAD
 # Neufeld lab 16S RNA analysis pipeline
 
 ## About
-16S RNA analysis workflow based on qiime2 wrapped in luigi framework.
+16S RNA analysis workflow based on QIIME2 wrapped in luigi framework.
 
-Currently, it uses conda 4.7.12 and qiime2 version 2019-07
+Currently, it uses conda 4.7.12 and QIIME2 version 2019-07.
+
+This repository is going through rapid changes so be aware if you are using this repository.
 
 **Note that previous versions of conda may cause problems**
 
 ## Required packages
 **conda 4.7.12 or newer** (No guarantee previous versions of conda will work!)  
-**qiime2 (tested with 2019-04 and 2019-07)**
+**QIIME2 (tested with 2019-04 and 2019-07)**
 
 Refer to 16S-luigi.yml file for details.
 
@@ -20,22 +21,22 @@ Refer to 16S-luigi.yml file for details.
 
 ```
 cd ~
-git clone https://github.com/danielm710/Neufeld-16S-Pipeline.git
+git clone https://github.com/neufeld/AXIOME3.git
 ```
 
-2. Change to Neufeld-16S-Pipeline directory.
+2. Change to AXIOME3
 
-`cd Neufeld-16S-Pipeline`
+`cd AXIOME3`
 
 ### You don't have a qiime virtual environment yet OR You want to create a new conda environment for the pipeline
 
 3.a. In this case, you can install conda environment directly from .yml file in this repository.
 
-`conda env create --name <ENV_NAME> --file conda_env_file/16S-luigi.yml`
+`conda env create --name <ENV_NAME> --file conda_env_file/AXIOME3.yml`
 
 *Make sure to replace <ENV_NAME> with actual name*
 
-e.g. `conda env create --name qiime_luigi --file conda_env_file/16S-luigi.yml`
+e.g. `conda env create --name qiime_luigi --file conda_env_file/AXIOME3.yml`
 
 Then, go to Step 4. (Activate your qiime2 environment)
 
@@ -68,51 +69,6 @@ If you still get different messages, ask lab bioinformaticians for help.
 4. Activate your qiime2 environment (if you already activated, ignore this step).
 
 `conda activate <QIIME_ENV>` (Replace <QIIME_ENV> with the environment name you chose)
-
-5. Export `/Data/reference_databases/qiime2/qiime2-helpers/scripts` as a PATH variable (so that you can access Jackson's script on the server).
-
-For people who are not familiar with commandline interface, you may follow the instruction below.
-
-### Adding PATH variable Example
-
-##### 1. Use your choice of text editor to open ~/.bashrc file.
-
-For example, (I use "vim" text editor)
-
-`vim ~/.bashrc`
-
-##### 2. Go to the end of the file
-
-For vim users, press G (uppercase G; it is case-sensitive!) 
-
-##### 3. Add 'PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts' to the end of the file
-
-For vim users, you may do the following...
-
-&nbsp;&nbsp;&nbsp;a) Press Esc button however many times you want (just to make sure you are not in some weird mode). 2-3 times should suffice. 
-
-&nbsp;&nbsp;&nbsp;b) Press o (lowercase alphabet 'o'). This should add a new line, and you will be able to type now.
-
-&nbsp;&nbsp;&nbsp;c) Add the following lines
-
-```
-# Temporary PATH variable to access Jackson's script
-PATH=${PATH}:/Data/reference_databases/qiime2/qiime2-helpers/scripts
-```
-
-&nbsp;&nbsp;&nbsp;d) Press Esc button once or twice
-
-&nbsp;&nbsp;&nbsp;e) Press : (colon), and type wq to write and quit.
-
-`:wq`
-
-##### 4. In the terminal, run
-
-`source ~/.bashrc`
-
-If you don't run this command, any changes you made in .bashrc file will NOT take effects (until you close the terminal and restart it)
-
-<br />
 
 ## Usage
 
