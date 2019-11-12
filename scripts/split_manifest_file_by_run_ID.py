@@ -34,25 +34,28 @@ def main(args):
     # Load manifest file
     # TODO - check for second row specifying types and add as a second header row if it exists
     logger.info("Loading manifest file")
-    manifest_table = pd.read_csv(input_filepath, sep = '\t', header = 0)
+    manifest_table = pd.read_csv(input_filepath, header = 0)
 
     # Does run_ID exist?
     if 'run_ID' not in manifest_table.columns.values.tolist():
         logger.error("Did not find the 'run_ID' column in the provided manifest file. Cannot divide the manifest file by run. Exiting...")
         sys.exit(1)
 
+
     # Get unique run IDs
     unique_run_IDs = set(manifest_table['run_ID'])
 
     # Split table and write
     for run_ID in unique_run_IDs:
-        output_filename = "manifest_" + run_ID + ".tsv"
+        output_filename = "manifest_" + str(run_ID) + ".csv"
         output_filepath = os.path.join(output_dir, output_filename)
         # TODO - check if output_filepath already exists and do not write output unless --force is specified
-        logger.info("Writing run '" + run_ID + "' to file '" + output_filename + "'")
+        logger.info("Writing run '" + str(run_ID) + "' to file '" + output_filename + "'")
         
         single_run_table = manifest_table[manifest_table['run_ID'] == run_ID]
-        pd.DataFrame.to_csv(single_run_table, output_filepath, sep = '\t', index = False)
+        # Drop run_ID column
+        single_run_table = single_run_table.drop(['run_ID'], axis=1)
+        pd.DataFrame.to_csv(single_run_table, output_filepath, index = False)
     
     logger.info(os.path.basename(sys.argv[0]) + ": done.")
 

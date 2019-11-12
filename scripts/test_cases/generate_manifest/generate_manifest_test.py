@@ -1,6 +1,6 @@
 # Add parent directory to path
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 # Unit test modules
 import unittest
 from unittest import mock

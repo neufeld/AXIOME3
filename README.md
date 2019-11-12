@@ -5,9 +5,9 @@
 
 Currently, it uses conda 4.7.12 and QIIME2 version 2019-07.
 
-This repository is going through rapid changes so be aware if you are using this repository.
+Be aware that this repository is going through rapid changes if you plan to actively make use of this project.
 
-**Note that previous versions of conda may cause problems**
+**Note that previous versions of conda may cause problems.**
 
 ## Required packages
 **conda 4.7.12 or newer** (No guarantee previous versions of conda will work!)  
@@ -121,7 +121,25 @@ DD15,15,1,B3,V4-R18,GGTTGT,Pro341Fi1,TCTCGG,,
 
 ### Running Pipeline
 
-#### For people who are not comfortable with linux terminal
+It can handle multiple Illumina runs from different timestamps. All you have to do is adding "run_ID" column (case sensitive) to the manifest file as shown below. (run_ID does not necessarily have to be numbers)
+
+```
+sample-id,absolute-filepath,direction,run_ID
+RBH08,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/41_S41_L001_R1_001.fastq.gz,forward,1
+RBH08,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/41_S41_L001_R2_001.fastq.gz,reverse,1
+RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R1_001.fastq.gz,forward,1
+RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R2_001.fastq.gz,reverse,1
+RBH12,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/45_S45_L001_R1_001.fastq.gz,forward,2
+RBH12,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/45_S45_L001_R2_001.fastq.gz,reverse,2
+RBH13,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/46_S46_L001_R1_001.fastq.gz,forward,2
+RBH13,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/46_S46_L001_R2_001.fastq.gz,reverse,2
+```
+
+**If "run_ID" column is NOT present in the manifest file, the pipeline will assume all the samples come from the same run**
+
+#### Core Analysis
+
+This section covers core part of 16S rRNA analysis workflow that most people would want to run. 
 
 0. Activate conda environment and cd to Neufeld-16S-Pipeline (if you haven't already done so).
 
@@ -133,16 +151,14 @@ DD15,15,1,B3,V4-R18,GGTTGT,Pro341Fi1,TCTCGG,,
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--sample-type <SAMPLE_TYPE [default = SampleData[PairedEndSequencesWithQuality]]> \
-	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]> \
-	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
+	--input-format <INPUT_FORMAT [default = PairedEndFastqManifestPhred33]>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--sample-type SampleData[PairedEndSequencesWithQuality] \
-	--input-format PairedEndFastqManifestPhred33 \
-	--is-first yes
+	--input-format PairedEndFastqManifestPhred33
 ```
 
 Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default values.  
@@ -152,14 +168,12 @@ If this is the case, simply run
 - General Format -
 
 python luigi_config_generator.py \
-	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
-	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
-	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
-	--is-first yes
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt
 ```
 
 2. Run luigi pipeline to generate summary file for you to examine it.
@@ -191,9 +205,10 @@ output/
 └── paired-end-demux.qzv
 ```
 
-You may examine "paired-end-demux.qzv" file in qiime2 View to determine trim and truncation cutoff.
+You may examine "paired-end-demux.qzv" file using QIIME2 View (https://view.qiime2.org/) to determine trim and truncation cutoff (to denoise reads).  
+(Upload paired-end-demux.qzv file in QIIME2 View, and click on "Interactive Quality Plot" tab)
 
-3. Generate configuration file again (to specify other options).
+3. After determining denoise cutoff values, generate configuration file again to specify cutoff values.
 
 ```
 - General Format -
@@ -203,9 +218,7 @@ python luigi_config_generator.py \
 	--trim-left-f <TRIM_LEFT_F_VALUE [default = 19]> \
 	--trunc-len-f <TRUNC_LEN_F_VALUE [default = 250]> \
 	--trim-left-r <TRIM_LEFT_R_VALUE [default = 20]> \
-	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]> \
-	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]> \
-	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
+	--trunc-len-r <TRUNC_LEN_R_VALUE [default = 250]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
@@ -214,9 +227,47 @@ python luigi_config_generator.py \
 	--trim-left-f 19 \
 	--trunc-len-f 250 \
 	--trim-left-r 20 \
-	--trunc-len-r 250 \
-	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza \
-	--is-first no
+	--trunc-len-r 250
+```
+
+_(Again) Note that if you are okay with the default values, you can run the command below instead._
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE>
+-----------------------------------------------------------------------------
+- Actual Example -
+
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt
+```
+
+**_It is important that the classifier version MATCHES the qiime 2 version. It will throw an error otherwise_**
+
+4. Run the pipeline to denoise your reads. This step acts as the 2nd checkpoint since denoising takes the most amount of time during 16S rRNA analysis. (could take 10~50min depending on the number of samples)
+
+```
+python 16S_pipeline.py Merge_Denoise --local-scheduler
+```
+
+When it's done running, your screen should look something like this (takes some time to run)
+
+5. Generate configuration file again (to finish the rest of the workflow).
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--classifier <PATH_TO_YOUR_CLASSIFIER_FILE [default = qiime2-2019-07 version]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--classifier /Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza
 ```
 
 _(Again) Note that if you are okay with default values, you can run the command below instead._
@@ -225,56 +276,62 @@ _(Again) Note that if you are okay with default values, you can run the command 
 - General Format -
 
 python luigi_config_generator.py \
-	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
-	--is-first <FIRST TIME RUNNING THIS SCRIPT?>
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE>
 -----------------------------------------------------------------------------
 - Actual Example -
 
 python luigi_config_generator.py \
-	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
-	--is-first no
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt
 ```
 
 **_It is important that the classifier version MATCHES the qiime 2 version. It will throw an error otherwise_**
 
-4. Run luigi pipeline to run the rest of the worflow.
+6. Run luigi pipeline to run the rest of the worflow.
 
 ```
 python 16S_pipeline.py Run_All --local-scheduler
 ```
 
-When it's done running, your screen should look something like this (takes some time to run)
+When it's done running, your screen should look something like this
 
 ```
 ===== Luigi Execution Summary =====
 
-Scheduled 12 tasks of which:
-* 2 complete ones were encountered:
-    - 1 Import_Data(sample_type=SampleData[PairedEndSequencesWithQuality], input_format=PairedEndFastqManifestPhred33)
-    - 1 Summarize()
-* 10 ran successfully:
+Scheduled 14 tasks of which:
+* 9 complete ones were encountered:
     - 1 Convert_Biom_to_TSV()
-    - 1 Denoise(trim_left_f=19, trunc_len_f=250, trim_left_r=20, trunc_len_r=250, n_threads=10)
     - 1 Denoise_Tabulate()
-    - 1 Export_Feature_Table()
     - 1 Export_Representative_Seqs()
+    - 1 Export_Taxonomy()
+    - 1 Merge_Denoise()
     ...
+* 5 ran successfully:
+    - 1 Convert_Rarefy_Biom_to_TSV()
+    - 1 Core_Analysis()
+    - 1 Export_Rarefy_Feature_Table()
+    - 1 Generate_Combined_Feature_Table()
+    - 1 Rarefy(sampling_depth=10000)
 
 This progress looks :) because there were no failed tasks or missing dependencies
 
 ===== Luigi Execution Summary =====
 ```
 
-5. Your "output" directory (directory named "output") should look something like this
+7. Your "output" directory (directory named "output") should look something like this
 
 ```
-output/
+output
+├── core_analysis_done
 ├── dada2
 │   ├── dada2_log.txt
-│   ├── dada2-rep-seqs.qza
-│   ├── dada2-table.qza
-│   ├── stats-dada2.qza
-│   └── stats-dada2.qzv
+│   ├── dada2_rep_seqs.qza
+│   ├── dada2_table.qza
+│   ├── merged
+│   │   ├── merged_dada2_rep_seqs.qzv
+│   │   ├── merged_rep_seqs.qza
+│   │   └── merged_table.qza
+│   ├── stats_dada2.qza
+│   └── stats_dada2.qzv
 ├── exported
 │   ├── ASV_table_combined.log
 │   ├── ASV_table_combined.tsv
@@ -282,8 +339,22 @@ output/
 │   ├── feature-table.biom
 │   ├── feature-table.tsv
 │   └── taxonomy.tsv
-├── paired-end-demux.qza
-├── paired-end-demux.qzv
+├── manifest
+│   └── manifest.csv
+├── paired_end_demux.qza
+├── paired_end_demux.qzv
+├── phylogeny
+│   ├── aligned_rep_seqs.qza
+│   ├── masked_aligned_rep_seqs.qza
+│   ├── rooted_tree.qza
+│   └── unrooted_tree.qza
+├── rarefy
+│   └── rarefied_table.qza
+├── rarefy_exported
+│   ├── ASV_rarefied_table_combined.log
+│   ├── ASV_rarefied_table_combined.tsv
+│   ├── feature-table.biom
+│   └── feature-table.tsv
 └── taxonomy
     ├── taxonomy_log.txt
     ├── taxonomy.qza
@@ -292,7 +363,41 @@ output/
 
 _if you don't see the above message (notice the smiley face, ":)"), or your output directory is missing some files, it means the pipeline is not successfully run. Check with the lab's bioinformatician if the error is not obvious_
 
-6. Make sure to rename or move this directory to somewhere else when you are done running the pipeline.
+#### Post Analysis
+This section is the extension of "Core Analysis" section. **It requires all the outputs from the "Core Analysis" section, so DO NOT remove any files or folders if you wish to run this section**
+
+##### - Core Metrics Phylogeny -
+It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
+
+8. Generate configuration file.
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--metadata <PATH_TO_YOUR_METADATA_FILE> \
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
+	--sampling-depth 10000
+```
+
+9. Run the pipeline 
+
+```
+python 16S_pipeline.py Core_Metrics_Phylogeny --local-scheduler
+```
+
+**Note that you may repeat Step 8 and 9 to generate PCoA plots based on different rarefaction thresholds. Just make sure to remove "core_div_phylogeny" directory prior to do so**
+
+`rm -r output/core_div_phylogeny`
+
+10. Make sure to rename or move 'output' directory to somewhere else when you are done running the pipeline.
 
 **by default, luigi pipeline looks at "output" directory to check for successful tasks, so if all the files already exist in this directory (e.g. from analyzing your previous samples), it will think there aren't any jobs to be run for the new samples since all the files are there.**
 
@@ -302,27 +407,3 @@ Let's say you want to move "output" directory to "Analysis" directory under the 
 You may run the command below to do so.
 
 `mv output ~/Analysis/Illumina_Run3` ("~" means home directory fyi)
-
-#### For people who are fairly comfortable with linux terminal, AND know how to edit files from the terminal
-
-1. Change directory to "configuration directory".
-
-`cd configuration`
-
-2. Copy template config file, and rename the copied config as luigi.cfg.
-
-`cp template.cfg luigi.cfg`
-
-3. Edit luigi.cfg to change qiime2 options.
-4. cd to the previous dir and run pipeline to get the summary file.
-
-```
-cd ..
-python 16S_pipeline.py Summarize --local-scheduler
-```
-
-5. Inspect the .qzv file, and edit `luigi.cfg` to modify parameters.
-
-6. Run the pipeline again to finish the rest of the workflow.
-
-`python 16S_pipeline.py Run_All --local-scheduler`

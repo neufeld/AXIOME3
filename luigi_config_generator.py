@@ -1,3 +1,7 @@
+"""
+This is a temporary script to generate configuration file for luigi framewoork.
+It will be deprecated in the future development. 
+"""
 from argparse import ArgumentParser
 import sys
 import subprocess
@@ -73,18 +77,11 @@ def args_parse():
             default="/Data/reference_databases/qiime2/training_classifier/silva132_V4V5_qiime2-2019.7/classifier_silva_132_V4V5.qza"
             )
 
-    parser.add_argument('--out-prefix', help="""
-            Name of the output directory. All the outputs will be stored in
-            this directory.
+    parser.add_argument('--sampling-depth', help="""
+            The total frequency that each sample should be rarefied to.
             """,
-            default="output")
+            default=10000)
 
-    parser.add_argument('--is-first', help="""
-            First time running? If so, it will warn users if the same output
-            directory exists.
-            """,
-            type=str2bool,
-            required=True)
 
     return parser
 
@@ -107,15 +104,24 @@ def get_luigi_config(template, args):
     """
 
     config_data = template.replace("<MANIFEST_PATH>", args.manifest, 1)\
-                            .replace("<METADATA_PATH>", args.metadata, 1)\
-                            .replace("<PREFIX>", args.out_prefix,1)\
                             .replace("<SAMPLE_TYPE>", args.sample_type, 1)\
                             .replace("<INPUT_FORMAT>", args.input_format, 1)\
                             .replace("<TRIM_LEFT_F>", str(args.trim_left_f), 1)\
                             .replace("<TRUNC_LEN_F>", str(args.trunc_len_f), 1)\
                             .replace("<TRIM_LEFT_R>", str(args.trim_left_r), 1)\
                             .replace("<TRUNC_LEN_R>", str(args.trunc_len_r), 1)\
-                            .replace("<CLASSIFIER_PATH>", args.classifier, 1)
+                            .replace("<CLASSIFIER_PATH>", args.classifier, 1)\
+                            .replace("<SAMPLING_DEPTH>", args.sampling_depth, 1)
+
+    # Check if metadata file is provided
+    if(args.metadata):
+        config_data = config_data.replace("<METADATA_PATH>", args.metadata, 1)\
+    # Check if multiple_run column exists in manifest file
+    # For now, assume first line is header?
+    with open(args.manifest, 'r') as fh:
+        header = fh.readline()
+        if("run_ID" in header):
+            config_data = config_data.replace("<IS_MULTIPLE>", "y", 1)
 
     return config_data
 

@@ -4,6 +4,7 @@ import sys
 #from subprocess import check_output, CalledProcessError
 import subprocess
 import logging
+import pandas as pd
 
 # Define custom logger
 logger = logging.getLogger("custom logger")
@@ -17,6 +18,9 @@ formatters = {
         'GREEN': '\033[92m',
         'END': '\033[0m'
         }
+
+# Script directory
+script_dir = "scripts"
 
 def run_cmd(cmd, step):
     #try:
@@ -59,12 +63,27 @@ def run_cmd(cmd, step):
     else:
         return stdout
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    # Return false for all other strings
+    else:
+        return False
+
+    #elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    #    return False
+    #else:
+    #    raise argparse.ArgumentTypeError('Boolean value expected.')
+
 class Out_Prefix(luigi.Config):
     prefix = luigi.Parameter()
 
 class Output_Dirs(luigi.Config):
     # Define output paths
     out_dir = Out_Prefix().prefix
+    manifest_dir = os.path.join(out_dir, "manifest")
     denoise_dir = os.path.join(out_dir, "dada2")
     rarefy_dir = os.path.join(out_dir, "rarefy")
     taxonomy_dir = os.path.join(out_dir, "taxonomy")
@@ -83,6 +102,72 @@ class Samples(luigi.Config):
     """
     manifest_file = luigi.Parameter()
     metadata_file = luigi.Parameter(default='')
+    is_multiple = luigi.Parameter(default='n')
+    sampling_depth = luigi.Parameter(default='10000')
+
+    def get_samples(self):
+        manifest_df = pd.read_csv(self.manifest_file, index_col=0)
+
+        # Return set of sample IDs if multiple IDs found
+        if('run_ID' in manifest_df.columns):
+            return set(manifest_df['run_ID'])
+        # Return empty set if single run
+        else:
+            return set()
+
+class Split_Samples(luigi.Task):
+    """
+    Split samples based on metadata
+    """
+    out_dir = Output_Dirs().manifest_dir
+
+    def output(self):
+        samples = Samples().get_samples()
+        is_multiple = str2bool(Samples().is_multiple)
+
+        # If multiple runs are specified in manifest file
+        if(is_multiple):
+            output = {}
+            for sample in samples:
+                manifest = "manifest_" + str(sample) + ".csv"
+                out_path = os.path.join(self.out_dir, manifest)
+
+                output[str(sample)] = luigi.LocalTarget(out_path)
+
+            return output
+        # Single run case
+        else:
+            output = os.path.join(self.out_dir, "manifest.csv")
+
+            return luigi.LocalTarget(output)
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.out_dir],
+                self)
+
+        # Split manifest if multiple runs in manifest file
+        manifest_path = Samples().manifest_file
+        is_multiple = str2bool(Samples().is_multiple)
+
+        if(is_multiple):
+            split_script = os.path.join(script_dir,
+                    "split_manifest_file_by_run_ID.py")
+
+            cmd = ['python',
+                    split_script,
+                    '--input_filepath',
+                    manifest_path,
+                    '--output_dir',
+                    self.out_dir]
+        else:
+            cmd = ['cp',
+                    manifest_path,
+                    self.output().path]
+
+        run_cmd(cmd, self)
 
 class Import_Data(luigi.Task):
     # Options for qiime tools import
@@ -90,57 +175,109 @@ class Import_Data(luigi.Task):
             default='SampleData[PairedEndSequencesWithQuality]')
     input_format = luigi.Parameter(default="PairedEndFastqManifestPhred33")
 
-    def output(self):
-        paired_end_demux = os.path.join(Output_Dirs().out_dir, "paired-end-demux.qza")
+    out_dir = Output_Dirs().out_dir
+    samples = Samples().get_samples()
+    is_multiple = str2bool(Samples().is_multiple)
 
-        return luigi.LocalTarget(paired_end_demux)
+    def requires(self):
+        return Split_Samples()
+
+    def output(self):
+        # Multiple run specified in the manifest file
+        if(self.is_multiple):
+            output = {}
+            for sample in self.samples:
+                prefix = str(sample) + "_paired_end_demux.qza"
+                paired_end_demux = os.path.join(self.out_dir, prefix)
+
+                output[str(sample)] = luigi.LocalTarget(paired_end_demux)
+
+            return output
+        # Single  run case
+        else:
+            paired_end_demux = os.path.join(self.out_dir, "paired_end_demux.qza")
+
+            return luigi.LocalTarget(paired_end_demux)
 
     def run(self):
         step = str(self)
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                Output_Dirs().out_dir],
-                self)
+                self.out_dir],
+                step)
 
-        inputPath = Samples().manifest_file
+        #inputPath = Samples().manifest_file
+        #
+        ## Make sure input file actually exists
+        #try:
+        #    with open(inputPath, 'r') as fh:
+        #        fh.readlines()
+        #except FileNotFoundError:
+        #    logger.error("Input file for qiime tools import does not exist...")
+        #    raise
+        ## in case of unexpected errors
+        #except Exception as err:
+        #    logger.error(
+        #    "In Import_Data() following error occured\n" + str(err))
+        #    raise
 
-        # Make sure input file actually exists
-        try:
-            with open(inputPath, 'r') as fh:
-                fh.readlines()
-        except FileNotFoundError:
-            logger.error("Input file for qiime tools import does not exist...")
-            sys.exit(1)
-        # in case of unexpected errors
-        except Exception as err:
-            logger.error(
-            "In Import_Data() following error occured\n" + str(err))
-            raise
+        # Multiple run
+        if(self.is_multiple):
+            for sample in self.samples:
+                cmd = ["qiime",
+                        "tools",
+                        "import",
+                        "--type",
+                        self.sample_type,
+                        "--input-path",
+                        self.input()[str(sample)].path,
+                        "--output-path",
+                        self.output()[str(sample)].path,
+                        "--input-format",
+                        self.input_format]
+                run_cmd(cmd, self)
+        # Single run
+        else:
+            inputPath = Samples().manifest_file
+            cmd = ["qiime",
+                    "tools",
+                    "import",
+                    "--type",
+                    self.sample_type,
+                    "--input-path",
+                    inputPath,
+                    "--output-path",
+                    self.output().path,
+                    "--input-format",
+                    self.input_format]
 
-        cmd = ["qiime",
-                "tools",
-                "import",
-                "--type",
-                self.sample_type,
-                "--input-path",
-                inputPath,
-                "--output-path",
-                self.output().path,
-                "--input-format",
-                self.input_format]
-
-        output = run_cmd(cmd, self)
+            run_cmd(cmd, self)
 
 class Summarize(luigi.Task):
+    samples = Samples().get_samples()
+    is_multiple = str2bool(Samples().is_multiple)
+    out_dir = Output_Dirs().out_dir
 
     def requires(self):
         return Import_Data()
 
     def output(self):
-        summary_file = os.path.join(Output_Dirs().out_dir, "paired-end-demux.qzv")
+        # Multiple run
+        if(self.is_multiple):
+            output = {}
+            for sample in self.samples:
+                prefix = str(sample) + "_paired_end_demux.qzv"
+                paired_end_demux = os.path.join(self.out_dir, prefix)
 
-        return luigi.LocalTarget(summary_file)
+                output[str(sample)] = luigi.LocalTarget(paired_end_demux)
+
+            return output
+        # Single run
+        else:
+            summary_file = os.path.join(self.out_dir, "paired_end_demux.qzv")
+
+            return luigi.LocalTarget(summary_file)
 
     def run(self):
         step = str(self)
@@ -150,16 +287,31 @@ class Summarize(luigi.Task):
                 Output_Dirs().out_dir],
                 step)
 
-        # Generate summary file
-        cmd = ["qiime",
-                "demux",
-                "summarize",
-                "--i-data",
-                self.input().path,
-                "--o-visualization",
-                self.output().path]
+        # Multiple run
+        if(self.is_multiple):
+            for sample in self.samples:
+            # Generate summary file
+                cmd = ["qiime",
+                        "demux",
+                        "summarize",
+                        "--i-data",
+                        self.input()[str(sample)].path,
+                        "--o-visualization",
+                        self.output()[str(sample)].path]
 
-        run_cmd(cmd, step)
+                run_cmd(cmd, self)
+        # Single run
+        else:
+            # Generate summary file
+            cmd = ["qiime",
+                    "demux",
+                    "summarize",
+                    "--i-data",
+                    self.input().path,
+                    "--o-visualization",
+                    self.output().path]
+
+            run_cmd(cmd, self)
 
 class Denoise(luigi.Task):
     trim_left_f = luigi.Parameter(default="19")
@@ -168,67 +320,259 @@ class Denoise(luigi.Task):
     trunc_len_r = luigi.Parameter(default="250")
     n_threads = luigi.Parameter(default="10")
 
+    samples = Samples().get_samples()
+    is_multiple = str2bool(Samples().is_multiple)
+    denoise_dir = Output_Dirs().denoise_dir
+
     def requires(self):
         return Import_Data()
 
     def output(self):
-        denoise_table = os.path.join(Output_Dirs().denoise_dir, "dada2-table.qza")
-        rep_seqs = os.path.join(Output_Dirs().denoise_dir, "dada2-rep-seqs.qza")
-        denoise_stats = os.path.join(Output_Dirs().denoise_dir, "stats-dada2.qza")
-        dada2_log = os.path.join(Output_Dirs().denoise_dir, "dada2_log.txt")
+        # Multiple runs
+        if(self.is_multiple):
+            output = {}
+            for sample in self.samples:
+                table_prefix = str(sample) + "_dada2_table.qza"
+                seq_prefix = str(sample) + "_dada2_rep_seqs.qza"
+                stats_prefix = str(sample) + "_stats_dada2.qza"
+                log_prefix = str(sample) + "_dada2_log.txt"
 
-        out = {
-                "table": luigi.LocalTarget(denoise_table),
-                "rep_seqs": luigi.LocalTarget(rep_seqs),
-                "stats": luigi.LocalTarget(denoise_stats),
-                "log": luigi.LocalTarget(dada2_log, format=luigi.format.Nop)
-                }
+                denoise_table = os.path.join(self.denoise_dir,
+                        str(sample), table_prefix)
+                rep_seqs = os.path.join(self.denoise_dir,
+                        str(sample), seq_prefix)
+                denoise_stats = os.path.join(self.denoise_dir,
+                        str(sample), stats_prefix)
+                dada2_log = os.path.join(self.denoise_dir,
+                        str(sample), log_prefix)
 
-        return out
+                denoise_out = {
+                        "table": luigi.LocalTarget(denoise_table),
+                        "rep_seqs": luigi.LocalTarget(rep_seqs),
+                        "stats": luigi.LocalTarget(denoise_stats),
+                        "log": luigi.LocalTarget(dada2_log, format=luigi.format.Nop)
+                        }
+
+                output[str(sample)] = denoise_out
+            return output
+        # Single run
+        else:
+            denoise_table = os.path.join(self.denoise_dir, "dada2_table.qza")
+            rep_seqs = os.path.join(self.denoise_dir, "dada2_rep_seqs.qza")
+            denoise_stats = os.path.join(self.denoise_dir, "stats_dada2.qza")
+            dada2_log = os.path.join(self.denoise_dir, "dada2_log.txt")
+
+            out = {
+                    "table": luigi.LocalTarget(denoise_table),
+                    "rep_seqs": luigi.LocalTarget(rep_seqs),
+                    "stats": luigi.LocalTarget(denoise_stats),
+                    "log": luigi.LocalTarget(dada2_log, format=luigi.format.Nop)
+                    }
+
+            return out
 
     def run(self):
-        step = str(self)
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().denoise_dir],
-                step)
+                self.denoise_dir],
+                self)
 
-        # Run dada2
-        cmd = ["qiime",
-                "dada2",
-                "denoise-paired",
-                "--i-demultiplexed-seqs",
-                self.input().path,
-                "--p-trim-left-f",
-                self.trim_left_f,
-                "--p-trunc-len-f",
-                self.trunc_len_f,
-                "--p-trim-left-r",
-                self.trim_left_r,
-                "--p-trunc-len-r",
-                self.trunc_len_r,
-                "--p-n-threads",
-                self.n_threads,
-                "--o-table",
-                self.output()["table"].path,
-                "--o-representative-sequences",
-                self.output()["rep_seqs"].path,
-                "--o-denoising-stats",
-                self.output()["stats"].path,
-                "--verbose"]
+        if(self.is_multiple):
+            # Get cutoff for each sample
+            #trim_left_f_list = self.trim_left_f.split(',')
+            #trunc_len_f_list = self.trunc_len_f.split(',')
+            #trim_left_r_list = self.trim_left_r.split(',')
+            #trunc_len_r_list = self.trunc_len_r.split(',')
 
-        output = run_cmd(cmd, step)
+            #trim_left_f_dict = {}
+            #trunc_len_f_dict = {}
+            #trim_left_r_dict = {}
+            #trunc_len_r_dict = {}
 
-        # Write a log file
-        with self.output()["log"].open('wb') as fh:
-            fh.write(output)
+            #for trim_f in trim_left_f_list:
+            #    sample_id = trim_f.split(':')[0].strip()
+            #    cutoff = trim_f.split(':')[1].strip()
+
+            #    trim_left_f_dict[sample_id] = cutoff
+
+            #for trunc_f in trunc_len_f_list:
+            #    sample_id = trunc_f.split(':')[0].strip()
+            #    cutoff = trunc_f.split(':')[1].strip()
+
+            #    trunc_len_f_dict[sample_id] = cutoff
+
+            #for trim_r in trim_left_r_list:
+            #    sample_id = trim_r.split(':')[0].strip()
+            #    cutoff = trim_r.split(':')[1].strip()
+
+            #    trim_left_r_dict[sample_id] = cutoff
+
+            #for trunc_r in trunc_len_r_list:
+            #    sample_id = trunc_r.split(':')[0].strip()
+            #    cutoff = trunc_r.split(':')[1].strip()
+
+            #    trunc_len_r_dict[sample_id] = cutoff
+
+            # Run dada2 for each sample
+            for sample in self.samples:
+                # Run dada2
+                #cmd = ["qiime",
+                #        "dada2",
+                #        "denoise-paired",
+                #        "--i-demultiplexed-seqs",
+                #        self.input()[str(sample)].path,
+                #        "--p-trim-left-f",
+                #        trim_left_f_dict[str(sample)],
+                #        "--p-trunc-len-f",
+                #        trunc_len_f_dict[str(sample)],
+                #        "--p-trim-left-r",
+                #        trim_left_r_dict[str(sample)],
+                #        "--p-trunc-len-r",
+                #        trunc_len_r_dict[str(sample)],
+                #        "--p-n-threads",
+                #        self.n_threads,
+                #        "--o-table",
+                #        self.output()[str(sample)]["table"].path,
+                #        "--o-representative-sequences",
+                #        self.output()[str(sample)]["rep_seqs"].path,
+                #        "--o-denoising-stats",
+                #        self.output()[str(sample)]["stats"].path,
+                #        "--verbose"]
+
+                # Make output directory
+                run_cmd(['mkdir',
+                        '-p',
+                        os.path.join(self.denoise_dir, str(sample))],
+                        self)
+
+                cmd = ["qiime",
+                        "dada2",
+                        "denoise-paired",
+                        "--i-demultiplexed-seqs",
+                        self.input()[str(sample)].path,
+                        "--p-trim-left-f",
+                        self.trim_left_f,
+                        "--p-trunc-len-f",
+                        self.trunc_len_f,
+                        "--p-trim-left-r",
+                        self.trim_left_r,
+                        "--p-trunc-len-r",
+                        self.trunc_len_r,
+                        "--p-n-threads",
+                        self.n_threads,
+                        "--o-table",
+                        self.output()[str(sample)]["table"].path,
+                        "--o-representative-sequences",
+                        self.output()[str(sample)]["rep_seqs"].path,
+                        "--o-denoising-stats",
+                        self.output()[str(sample)]["stats"].path,
+                        "--verbose"]
+
+                output = run_cmd(cmd, self)
+
+                # Write a log file
+                with self.output()[str(sample)]["log"].open('wb') as fh:
+                    fh.write(output)
+        else:
+            # Run dada2
+            cmd = ["qiime",
+                    "dada2",
+                    "denoise-paired",
+                    "--i-demultiplexed-seqs",
+                    self.input().path,
+                    "--p-trim-left-f",
+                    self.trim_left_f,
+                    "--p-trunc-len-f",
+                    self.trunc_len_f,
+                    "--p-trim-left-r",
+                    self.trim_left_r,
+                    "--p-trunc-len-r",
+                    self.trunc_len_r,
+                    "--p-n-threads",
+                    self.n_threads,
+                    "--o-table",
+                    self.output()["table"].path,
+                    "--o-representative-sequences",
+                    self.output()["rep_seqs"].path,
+                    "--o-denoising-stats",
+                    self.output()["stats"].path,
+                    "--verbose"]
+
+            output = run_cmd(cmd, self)
+
+            # Write a log file
+            with self.output()["log"].open('wb') as fh:
+                fh.write(output)
+
+class Merge_Denoise(luigi.Task):
+    samples = Samples().get_samples()
+    is_multiple = str2bool(Samples().is_multiple)
+    merged_dir = os.path.join(Output_Dirs().denoise_dir, "merged")
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        merged_table = os.path.join(self.merged_dir, "merged_table.qza")
+        merged_seqs = os.path.join(self.merged_dir, "merged_rep_seqs.qza")
+
+        output = {
+                'table': luigi.LocalTarget(merged_table),
+                'rep_seqs': luigi.LocalTarget(merged_seqs)
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.merged_dir],
+                self)
+
+        # Multiple runs
+        if(self.is_multiple):
+            table_cmd = ['qiime',
+                        'feature-table',
+                        'merge',
+                        '--o-merged-table',
+                        self.output()['table'].path]
+
+            seqs_cmd = ['qiime',
+                        'feature-table',
+                        'merge-seqs',
+                        '--o-merged-data',
+                        self.output()['rep_seqs'].path]
+
+            for sample in self.samples:
+                table_cmd.append('--i-tables')
+                table_cmd.append(self.input()[str(sample)]['table'].path)
+
+                seqs_cmd.append('--i-data')
+                seqs_cmd.append(self.input()[str(sample)]['rep_seqs'].path)
+
+            run_cmd(table_cmd, self)
+            run_cmd(seqs_cmd, self)
+        # Single run
+        else:
+            run_cmd(['cp',
+                    self.input()['table'].path,
+                    self.output()['table'].path],
+                    self)
+
+            run_cmd(['cp',
+                    self.input()['rep_seqs'].path,
+                    self.output()['rep_seqs'].path],
+                    self)
 
 class Rarefy(luigi.Task):
     sampling_depth = luigi.Parameter(default="10000")
 
+    rarefy_dir = Output_Dirs().rarefy_dir
+
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
         rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
@@ -237,13 +581,11 @@ class Rarefy(luigi.Task):
         return luigi.LocalTarget(rarefied_table)
 
     def run(self):
-        step = str(self)
-
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().rarefy_dir],
-                step)
+                self.rarefy_dir],
+                self)
 
         # Rarefy
         cmd = ["qiime",
@@ -256,18 +598,20 @@ class Rarefy(luigi.Task):
                 "--o-rarefied-table",
                 self.output().path
                 ]
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
     n_jobs = luigi.Parameter(default="10")
 
+    taxonomy_dir = Output_Dirs().taxonomy_dir
+
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
-        classified_taxonomy = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy.qza")
-        taxonomy_log = os.path.join(Output_Dirs().taxonomy_dir, "taxonomy_log.txt")
+        classified_taxonomy = os.path.join(self.taxonomy_dir, "taxonomy.qza")
+        taxonomy_log = os.path.join(self.taxonomy_dir, "taxonomy_log.txt")
 
         output = {
                 "taxonomy": luigi.LocalTarget(classified_taxonomy),
@@ -277,13 +621,11 @@ class Taxonomic_Classification(luigi.Task):
         return output
 
     def run(self):
-        step = str(self)
-
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().taxonomy_dir],
-                step)
+                self.taxonomy_dir],
+                self)
 
         # Run qiime classifier
         cmd = ["qiime",
@@ -299,29 +641,29 @@ class Taxonomic_Classification(luigi.Task):
                 self.n_jobs,
                 "--verbose"]
 
-        output = run_cmd(cmd, step)
+        output = run_cmd(cmd, self)
 
         # Log result
         with self.output()["log"].open('wb') as fh:
             fh.write(output)
 
 class Export_Feature_Table(luigi.Task):
+    export_dir = Output_Dirs().export_dir
 
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
-        biom = os.path.join(Output_Dirs().export_dir, "feature-table.biom")
+        biom = os.path.join(self.export_dir, "feature-table.biom")
 
         return luigi.LocalTarget(biom)
 
     def run(self):
-        step = str(self)
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
-                step)
+                self.export_dir],
+                self)
 
         # Export file
         cmd = ["qiime",
@@ -332,7 +674,7 @@ class Export_Feature_Table(luigi.Task):
                 "--output-path",
                 os.path.dirname(self.output().path)]
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 class Export_Rarefy_Feature_Table(luigi.Task):
 
@@ -393,22 +735,22 @@ class Export_Taxonomy(luigi.Task):
         run_cmd(cmd, step)
 
 class Export_Representative_Seqs(luigi.Task):
+    export_dir = Output_Dirs().export_dir
 
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
-        fasta = os.path.join(Output_Dirs().export_dir, "dna-sequences.fasta")
+        fasta = os.path.join(self.export_dir, "dna-sequences.fasta")
 
         return luigi.LocalTarget(fasta)
 
     def run(self):
-        step = str(self)
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
-                step)
+                self.export_dir],
+                self)
 
         # Export file
         cmd = ["qiime",
@@ -419,7 +761,7 @@ class Export_Representative_Seqs(luigi.Task):
                 "--output-path",
                 os.path.dirname(self.output().path)]
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 class Convert_Biom_to_TSV(luigi.Task):
 
@@ -518,7 +860,10 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 step)
 
         # Run Jackson's script on pre-rarefied table
-        cmd_pre_rarefied = ["generate_combined_feature_table.py",
+        combined_feature_table_script = os.path.join(script_dir,
+                "generate_combined_feature_table.py")
+
+        cmd_pre_rarefied = [combined_feature_table_script,
                 "-f",
                 self.input()["Convert_Biom_to_TSV"].path,
                 "-s",
@@ -531,7 +876,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
         logged_pre_rarefied = run_cmd(cmd_pre_rarefied, step)
 
         # Run Jackson's script on rarefied table
-        cmd_rarefied = ["generate_combined_feature_table.py",
+        cmd_rarefied = [combined_feature_table_script,
                 "-f",
                 self.input()["Convert_Rarefy_Biom_to_TSV"].path,
                 "-s",
@@ -552,18 +897,19 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
 # Post Analysis
 class Phylogeny_Tree(luigi.Task):
+    phylogeny_dir = Output_Dirs().phylogeny_dir
 
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
-        alignment = os.path.join(Output_Dirs().phylogeny_dir,
+        alignment = os.path.join(self.phylogeny_dir,
                 "aligned_rep_seqs.qza")
-        masked_alignment = os.path.join(Output_Dirs().phylogeny_dir,
+        masked_alignment = os.path.join(self.phylogeny_dir,
                 "masked_aligned_rep_seqs.qza")
-        tree = os.path.join(Output_Dirs().phylogeny_dir,
+        tree = os.path.join(self.phylogeny_dir,
                 "unrooted_tree.qza")
-        rooted_tree = os.path.join(Output_Dirs().phylogeny_dir,
+        rooted_tree = os.path.join(self.phylogeny_dir,
                 "rooted_tree.qza")
 
         out = {
@@ -576,12 +922,10 @@ class Phylogeny_Tree(luigi.Task):
         return out
 
     def run(self):
-        step = str(self)
-
         # Create output directory
         run_cmd(['mkdir',
                 '-p',
-                Output_Dirs().phylogeny_dir], step)
+                self.phylogeny_dir], self)
 
         # Make phylogeny tree
         cmd = ['qiime',
@@ -599,14 +943,14 @@ class Phylogeny_Tree(luigi.Task):
                 self.output()['rooted_tree'].path
         ]
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 class Core_Metrics_Phylogeny(luigi.Task):
-    sampling_depth = luigi.Parameter(default="10000")
+    sampling_depth = Samples().sampling_depth
 
     def requires(self):
         return {
-                'Denoise': Denoise(),
+                'Merge_Denoise': Merge_Denoise(),
                 'Phylogeny_Tree': Phylogeny_Tree()
                 }
 
@@ -667,13 +1011,11 @@ class Core_Metrics_Phylogeny(luigi.Task):
         return out
 
     def run(self):
-        step = str(self)
-
         # Create output directory
         run_cmd(['mkdir',
                 '-p',
                 Output_Dirs().core_metric_dir],
-                step)
+                self)
 
         # Run core-metric-phylogenetic
         cmd = [
@@ -681,7 +1023,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 'diversity',
                 'core-metrics-phylogenetic',
                 '--i-table',
-                self.input()['Denoise']['table'].path,
+                self.input()['Merge_Denoise']['table'].path,
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-sampling-depth',
@@ -729,59 +1071,87 @@ class Core_Metrics_Phylogeny(luigi.Task):
             cmd.append('--m-metadata-file')
             cmd.append(metadata)
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 # Visualizations
 class Denoise_Tabulate(luigi.Task):
-    out_dir = Output_Dirs().denoise_dir
+    samples = Samples().get_samples()
+    is_multiple = str2bool(Samples().is_multiple)
+    denoise_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Denoise()
 
     def output(self):
-        denoise_tabulated = os.path.join(self.out_dir, "stats-dada2.qzv")
+        if(self.is_multiple):
+            output = {}
+            for sample in self.samples:
+                out_dir = os.path.join(self.denoise_dir, str(sample))
+                prefix = str(sample) + "_stats_dada2.qzv"
+                denoise_tabulated = os.path.join(out_dir, prefix)
 
-        return luigi.LocalTarget(denoise_tabulated)
+                output[str(sample)] = luigi.LocalTarget(denoise_tabulated)
+
+            return output
+        else:
+            denoise_tabulated = os.path.join(self.denoise_dir, "stats_dada2.qzv")
+
+            return luigi.LocalTarget(denoise_tabulated)
 
     def run(self):
-        step = str(self)
-
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.out_dir],
-                step)
+                self.denoise_dir],
+                self)
 
-        # Run qiime metadata tabulate
-        cmd = ["qiime",
-                "metadata",
-                "tabulate",
-                "--m-input-file",
-                self.input()["stats"].path,
-                "--o-visualization",
-                self.output().path]
+        if(self.is_multiple):
+            for sample in self.samples:
+                # Make sub-output directory
+                run_cmd(["mkdir",
+                        '-p',
+                        os.path.join(self.denoise_dir, str(sample))],
+                        self)
 
-        run_cmd(cmd, step)
+                # Run qiime metadata tabulate
+                cmd = ["qiime",
+                        "metadata",
+                        "tabulate",
+                        "--m-input-file",
+                        self.input()[str(sample)]["stats"].path,
+                        "--o-visualization",
+                        self.output()[str(sample)].path]
+
+                run_cmd(cmd, self)
+        else:
+            # Run qiime metadata tabulate
+            cmd = ["qiime",
+                    "metadata",
+                    "tabulate",
+                    "--m-input-file",
+                    self.input()["stats"].path,
+                    "--o-visualization",
+                    self.output().path]
+
+            run_cmd(cmd, self)
 
 class Sequence_Tabulate(luigi.Task):
-    out_dir = Output_Dirs().denoise_dir
+    merged_dir = os.path.join(Output_Dirs().denoise_dir, "merged")
 
     def requires(self):
-        return Denoise()
+        return Merge_Denoise()
 
     def output(self):
-        sequence_tabulated = os.path.join(self.out_dir, "dada2_rep_seqs.qzv")
+        sequence_tabulated = os.path.join(self.merged_dir, "merged_dada2_rep_seqs.qzv")
 
         return luigi.LocalTarget(sequence_tabulated)
 
     def run(self):
-        step = str(self)
-
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.out_dir],
-                step)
+                self.merged_dir],
+                self)
 
         # Run qiime metadata tabulate
         cmd = ["qiime",
@@ -792,7 +1162,7 @@ class Sequence_Tabulate(luigi.Task):
                 "--o-visualization",
                 self.output().path]
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
 class Taxonomy_Tabulate(luigi.Task):
     out_dir = Output_Dirs().taxonomy_dir
@@ -831,7 +1201,7 @@ class Rarefaction_Curves(luigi.Task):
 
     def requires(self):
         return {
-                'Denoise': Denoise(),
+                'Merge_Denoise': Merge_Denoise(),
                 'Phylogeny_Tree': Phylogeny_Tree()
                 }
 
@@ -842,12 +1212,11 @@ class Rarefaction_Curves(luigi.Task):
         return luigi.LocalTarget(alpha_rarefaction)
 
     def run(self):
-        step = str(self)
         # Make directory
         run_cmd(['mkdir',
                 '-p',
                 self.out_dir],
-                step)
+                self)
 
         # Make alpha rarefaction curve
         cmd = [
@@ -855,7 +1224,7 @@ class Rarefaction_Curves(luigi.Task):
                 'diversity',
                 'alpha-rarefaction',
                 '--i-table',
-                self.input()['Denoise']['table'].path,
+                self.input()['Merge_Denoise']['table'].path,
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-max-depth',
@@ -864,27 +1233,27 @@ class Rarefaction_Curves(luigi.Task):
                 self.output().path
                 ]
 
-        run_cmd(cmd, step)
+        run_cmd(cmd, self)
 
-class Run_All(luigi.Task):
+class Core_Analysis(luigi.Task):
+    out_dir = Output_Dirs().out_dir
+
     def requires(self):
         return [
-                Import_Data(),
                 Summarize(),
-                Denoise(),
-                Denoise_Tabulate(),
-                Rarefy(),
-                Taxonomic_Classification(),
-                Taxonomy_Tabulate(),
-                Export_Feature_Table(),
-                Export_Rarefy_Feature_Table(),
-                Export_Taxonomy(),
-                Export_Representative_Seqs(),
-                Convert_Biom_to_TSV(),
-                Convert_Rarefy_Biom_to_TSV(),
                 Generate_Combined_Feature_Table(),
-                Core_Metrics_Phylogeny()
+                Phylogeny_Tree(),
+                Denoise_Tabulate(),
+                Sequence_Tabulate(),
+                Taxonomy_Tabulate()
                 ]
+
+    def output(self):
+        return luigi.LocalTarget(os.path.join(self.out_dir, "core_analysis_done"))
+
+    def run(self):
+        with self.output().open('w') as fh:
+            fh.write("Done!")
 
 if __name__ == '__main__':
     luigi.run()
