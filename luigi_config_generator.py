@@ -111,7 +111,7 @@ def get_luigi_config(template, args):
                             .replace("<TRIM_LEFT_R>", str(args.trim_left_r), 1)\
                             .replace("<TRUNC_LEN_R>", str(args.trunc_len_r), 1)\
                             .replace("<CLASSIFIER_PATH>", args.classifier, 1)\
-                            .replace("<SAMPLING_DEPTH>", args.sampling_depth, 1)
+                            .replace("<SAMPLING_DEPTH>", str(args.sampling_depth), 1)
 
     # Check if metadata file is provided
     if(args.metadata):
@@ -202,12 +202,6 @@ if __name__ == "__main__":
 
     # Check if required python packages exist
     check_env()
-
-    # Check output directory
-    # Warns about the same output direcotry if this script is called for the first time
-    # If run for the second time, it warns if the same output directory does
-    # NOT exist
-    check_outdir(args.out_prefix, args.is_first)
 
     # Generate config for luigi to use
     template_content = read_template_config()

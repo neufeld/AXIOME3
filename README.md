@@ -289,7 +289,7 @@ python luigi_config_generator.py \
 6. Run luigi pipeline to run the rest of the worflow.
 
 ```
-python 16S_pipeline.py Run_All --local-scheduler
+python 16S_pipeline.py Core_Analysis --local-scheduler
 ```
 
 When it's done running, your screen should look something like this
