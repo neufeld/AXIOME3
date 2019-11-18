@@ -208,6 +208,12 @@ output/
 You may examine "paired-end-demux.qzv" file using QIIME2 View (https://view.qiime2.org/) to determine trim and truncation cutoff (to denoise reads).  
 (Upload paired-end-demux.qzv file in QIIME2 View, and click on "Interactive Quality Plot" tab)
 
+There are maximum values for cutoff values for **trunc-len-f and trunc-len-r** if you wish to maintain an overlapping region. (See the diagram below for visual explanation)
+
+**Note that the illustrated amplicon is specific to the Neufeld Lab. Maximum cutoff values may differ if using different amplicons and/or sequencing technology**
+
+![alt text](https://github.com/neufeld/AXIOME3/blob/master/img/amplicon.jpeg "Amplicon DADA2 Cutoff Reference")
+
 3. After determining denoise cutoff values, generate configuration file again to specify cutoff values.
 
 ```
