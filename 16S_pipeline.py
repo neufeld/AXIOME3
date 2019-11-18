@@ -5,6 +5,7 @@ import sys
 import subprocess
 import logging
 import pandas as pd
+from textwrap import dedent
 
 # Define custom logger
 logger = logging.getLogger("custom logger")
@@ -92,6 +93,7 @@ class Output_Dirs(luigi.Config):
     phylogeny_dir = os.path.join(out_dir, "phylogeny")
     core_metric_dir = os.path.join(out_dir, "core_div_phylogeny")
     visualization_dir = os.path.join(out_dir, "visualization")
+    alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
 
 class Samples(luigi.Config):
     """
@@ -1235,6 +1237,98 @@ class Rarefaction_Curves(luigi.Task):
 
         run_cmd(cmd, self)
 
+class Alpha_Group_Significance(luigi.Task):
+    out_dir = Output_Dirs().alpha_sig_dir
+    metadata_file = Samples().metadata_file
+
+    def requires(self):
+        return Core_Metrics_Phylogeny()
+
+    def output(self):
+        faith_group_significance = os.path.join(self.out_dir,
+                "faith_pd_group_significance.qzv")
+        evenness_group_significance = os.path.join(self.out_dir,
+                "evenness_group_significance.qzv")
+        shannon_group_significance = os.path.join(self.out_dir,
+                "shannon_pd_group_significance.qzv")
+
+        output = {
+                'faith_pd_group_significance':
+                    luigi.LocalTarget(faith_group_significance),
+                'evenness_group_significance':
+                    luigi.LocalTarget(evenness_group_significance),
+                'shannon_group_significance':
+                    luigi.LocalTarget(shannon_group_significance)
+                }
+
+        return output
+
+    def run(self):
+        # Make sure Metadata file is provided and exists
+        if not(os.path.isfile(self.metadata_file)):
+            msg = dedent("""
+                    Metadata file is not provided or the provided Metadata file
+                    does not exist!
+                    """)
+
+            raise FileNotFoundError(msg)
+
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.out_dir],
+                self)
+
+        # Keys to input and output targets
+        alpha_groups = [
+                ('faith_pd_vector', 'faith_pd_group_significance'),
+                ('evenness_vector', 'evenness_group_significance'),
+                ('shannon_vector', 'shannon_group_significance')
+                ]
+
+        for input_key, output_key in alpha_groups:
+            cmd = ['qiime',
+                    'diversity',
+                    'alpha-group-significance',
+                    '--i-alpha-diversity',
+                    self.input()[input_key].path,
+                    '--m-metadata-file',
+                    self.metadata_file,
+                    '--o-visualization',
+                    self.output()[output_key].path]
+
+            run_cmd(cmd, self)
+
+# Get software version info
+class Get_Version_Info(luigi.Task):
+    out_dir = Output_Dirs().out_dir
+
+    def output(self):
+        version_info = os.path.join(self.out_dir, "version_info.txt")
+
+        return luigi.LocalTarget(version_info)
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.out_dir],
+                self)
+
+        # Get QIIME2 Version information
+        info = run_cmd(['qiime',
+                        'info'],
+                        self)
+
+        classifier_path = Taxonomic_Classification().classifier
+
+        with self.output().open('w') as fh:
+            fh.write(info.decode('utf-8'))
+            fh.write('\n\n')
+            fh.write('Taxonomic Classifier path\n')
+            fh.write(classifier_path)
+
+# Dummy Class to run multiple tasks
 class Core_Analysis(luigi.Task):
     out_dir = Output_Dirs().out_dir
 
@@ -1245,7 +1339,8 @@ class Core_Analysis(luigi.Task):
                 Phylogeny_Tree(),
                 Denoise_Tabulate(),
                 Sequence_Tabulate(),
-                Taxonomy_Tabulate()
+                Taxonomy_Tabulate(),
+                Get_Version_Info()
                 ]
 
     def output(self):
@@ -1254,6 +1349,14 @@ class Core_Analysis(luigi.Task):
     def run(self):
         with self.output().open('w') as fh:
             fh.write("Done!")
+
+class Post_Analysis(luigi.Task):
+    def requires(self):
+        return [
+                Core_Metrics_Phylogeny(),
+                Alpha_Group_Significance(),
+                Get_Version_Info()
+        ]
 
 if __name__ == '__main__':
     luigi.run()
