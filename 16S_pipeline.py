@@ -568,40 +568,6 @@ class Merge_Denoise(luigi.Task):
                     self.output()['rep_seqs'].path],
                     self)
 
-class Rarefy(luigi.Task):
-    sampling_depth = luigi.Parameter(default="10000")
-
-    rarefy_dir = Output_Dirs().rarefy_dir
-
-    def requires(self):
-        return Merge_Denoise()
-
-    def output(self):
-        rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
-                "rarefied_table.qza")
-
-        return luigi.LocalTarget(rarefied_table)
-
-    def run(self):
-        # Make output directory
-        run_cmd(["mkdir",
-                "-p",
-                self.rarefy_dir],
-                self)
-
-        # Rarefy
-        cmd = ["qiime",
-                "feature-table",
-                "rarefy",
-                "--i-table",
-                self.input()['table'].path,
-                "--p-sampling-depth",
-                self.sampling_depth,
-                "--o-rarefied-table",
-                self.output().path
-                ]
-        run_cmd(cmd, self)
-
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
     n_jobs = luigi.Parameter(default="10")
@@ -677,35 +643,6 @@ class Export_Feature_Table(luigi.Task):
                 os.path.dirname(self.output().path)]
 
         run_cmd(cmd, self)
-
-class Export_Rarefy_Feature_Table(luigi.Task):
-
-    def requires(self):
-        return Rarefy()
-
-    def output(self):
-        rarefied_biom = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.biom")
-
-        return luigi.LocalTarget(rarefied_biom)
-
-    def run(self):
-        step = str(self)
-        # Make directory
-        run_cmd(["mkdir",
-                "-p",
-                Output_Dirs().rarefy_export_dir],
-                step)
-
-        # Export file
-        cmd = ["qiime",
-                "tools",
-                "export",
-                "--input-path",
-                self.input().path,
-                "--output-path",
-                os.path.dirname(self.output().path)]
-
-        run_cmd(cmd, step)
 
 class Export_Taxonomy(luigi.Task):
 
@@ -794,72 +731,34 @@ class Convert_Biom_to_TSV(luigi.Task):
 
         run_cmd(cmd, step)
 
-class Convert_Rarefy_Biom_to_TSV(luigi.Task):
-
-    def requires(self):
-        return Export_Rarefy_Feature_Table()
-
-    def output(self):
-        tsv = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.tsv")
-
-        return luigi.LocalTarget(tsv)
-
-    def run(self):
-        step = str(self)
-        # Make output directory
-        run_cmd(["mkdir",
-                "-p",
-                Output_Dirs().rarefy_export_dir],
-                step)
-
-        # Convert to TSV
-        cmd = ["biom",
-                "convert",
-                "-i",
-                self.input().path,
-                "-o",
-                self.output().path,
-                "--to-tsv"]
-
-        run_cmd(cmd, step)
-
 class Generate_Combined_Feature_Table(luigi.Task):
+    export_dir = Output_Dirs().export_dir
 
     def requires(self):
         return {
                 "Export_Taxonomy": Export_Taxonomy(),
                 "Export_Representative_Seqs": Export_Representative_Seqs(),
                 "Convert_Biom_to_TSV": Convert_Biom_to_TSV(),
-                "Convert_Rarefy_Biom_to_TSV": Convert_Rarefy_Biom_to_TSV()
                 }
 
     def output(self):
-        combined_table = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.tsv")
-        log = os.path.join(Output_Dirs().export_dir, "ASV_table_combined.log")
+        combined_table = os.path.join(self.export_dir, "ASV_table_combined.tsv")
+        log = os.path.join(self.export_dir, "ASV_table_combined.log")
 
-        combined_rarefied_table = os.path.join(Output_Dirs().rarefy_export_dir,
-                "ASV_rarefied_table_combined.tsv")
-        rarefied_log = os.path.join(Output_Dirs().rarefy_export_dir,
-                "ASV_rarefied_table_combined.log")
 
         output = {
                 "table": luigi.LocalTarget(combined_table),
                 "log": luigi.LocalTarget(log, format=luigi.format.Nop),
-                "rarefied_table": luigi.LocalTarget(combined_rarefied_table),
-                "rarefied_log": luigi.LocalTarget(rarefied_log,
-                    format=luigi.format.Nop)
                 }
 
         return output
 
     def run(self):
-        step = str(self)
-
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
-                step)
+                self.export_dir],
+                self)
 
         # Run Jackson's script on pre-rarefied table
         combined_feature_table_script = os.path.join(script_dir,
@@ -875,29 +774,14 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 "-o",
                 self.output()["table"].path]
 
-        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, step)
-
-        # Run Jackson's script on rarefied table
-        cmd_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Convert_Rarefy_Biom_to_TSV"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["rarefied_table"].path]
-
-        logged_rarefied = run_cmd(cmd_rarefied, step)
+        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, self)
 
         # Write log files
         with self.output()["log"].open('w') as fh:
             fh.write(logged_pre_rarefied)
 
-        with self.output()["rarefied_log"].open('w') as fh:
-            fh.write(logged_rarefied)
-
 # Post Analysis
+# Most of these require rarefaction depth as a user parameter
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
 
@@ -1074,6 +958,145 @@ class Core_Metrics_Phylogeny(luigi.Task):
             cmd.append(metadata)
 
         run_cmd(cmd, self)
+
+class Rarefy(luigi.Task):
+    sampling_depth = luigi.Parameter(default="10000")
+
+    rarefy_dir = Output_Dirs().rarefy_dir
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
+                "rarefied_table.qza")
+
+        return luigi.LocalTarget(rarefied_table)
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.rarefy_dir],
+                self)
+
+        # Rarefy
+        cmd = ["qiime",
+                "feature-table",
+                "rarefy",
+                "--i-table",
+                self.input()['table'].path,
+                "--p-sampling-depth",
+                self.sampling_depth,
+                "--o-rarefied-table",
+                self.output().path
+                ]
+        run_cmd(cmd, self)
+
+class Export_Rarefy_Feature_Table(luigi.Task):
+
+    def requires(self):
+        return Rarefy()
+
+    def output(self):
+        rarefied_biom = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.biom")
+
+        return luigi.LocalTarget(rarefied_biom)
+
+    def run(self):
+        step = str(self)
+        # Make directory
+        run_cmd(["mkdir",
+                "-p",
+                Output_Dirs().rarefy_export_dir],
+                step)
+
+        # Export file
+        cmd = ["qiime",
+                "tools",
+                "export",
+                "--input-path",
+                self.input().path,
+                "--output-path",
+                os.path.dirname(self.output().path)]
+
+        run_cmd(cmd, step)
+
+class Convert_Rarefy_Biom_to_TSV(luigi.Task):
+
+    def requires(self):
+        return Export_Rarefy_Feature_Table()
+
+    def output(self):
+        tsv = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.tsv")
+
+        return luigi.LocalTarget(tsv)
+
+    def run(self):
+        step = str(self)
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                Output_Dirs().rarefy_export_dir],
+                step)
+
+        # Convert to TSV
+        cmd = ["biom",
+                "convert",
+                "-i",
+                self.input().path,
+                "-o",
+                self.output().path,
+                "--to-tsv"]
+
+        run_cmd(cmd, step)
+
+class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
+    rarefy_export_dir = Output_Dirs().rarefy_export_dir
+
+    def requires(self):
+        return {
+                "Export_Taxonomy": Export_Taxonomy(),
+                "Export_Representative_Seqs": Export_Representative_Seqs(),
+                "Convert_Rarefy_Biom_to_TSV": Convert_Rarefy_Biom_to_TSV()
+                }
+
+    def output(self):
+        combined_rarefied_table = os.path.join(self.rarefy_export_dir,
+                "ASV_rarefied_table_combined.tsv")
+        rarefied_log = os.path.join(self.rarefy_export_dir,
+                "ASV_rarefied_table_combined.log")
+
+        output = {
+                "rarefied_table": luigi.LocalTarget(combined_rarefied_table),
+                "rarefied_log": luigi.LocalTarget(rarefied_log,
+                    format=luigi.format.Nop)
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.rarefy_export_dir],
+                self)
+
+        # Run Jackson's script on rarefied table
+        cmd_rarefied = [combined_feature_table_script,
+                "-f",
+                self.input()["Convert_Rarefy_Biom_to_TSV"].path,
+                "-s",
+                self.input()["Export_Representative_Seqs"].path,
+                "-t",
+                self.input()["Export_Taxonomy"].path,
+                "-o",
+                self.output()["rarefied_table"].path]
+
+        logged_rarefied = run_cmd(cmd_rarefied, self)
+
+        with self.output()["rarefied_log"].open('w') as fh:
+            fh.write(logged_rarefied)
 
 # Visualizations
 class Denoise_Tabulate(luigi.Task):
@@ -1355,6 +1378,7 @@ class Post_Analysis(luigi.Task):
         return [
                 Core_Metrics_Phylogeny(),
                 Alpha_Group_Significance(),
+                Generate_Combined_Rarefied_Feature_Table(),
                 Get_Version_Info()
         ]
 
