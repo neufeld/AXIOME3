@@ -5,7 +5,7 @@
 
 Currently, it uses conda 4.7.12 and QIIME2 version 2019-07.
 
-Be aware that this repository is going through rapid changes if you plan to actively make use of this project.
+Be aware that this repository is going through rapid changes in case you plan to actively make use of this project.
 
 **Note that previous versions of conda may cause problems.**
 
@@ -354,28 +354,24 @@ output
 │   ├── masked_aligned_rep_seqs.qza
 │   ├── rooted_tree.qza
 │   └── unrooted_tree.qza
-├── rarefy
-│   └── rarefied_table.qza
-├── rarefy_exported
-│   ├── ASV_rarefied_table_combined.log
-│   ├── ASV_rarefied_table_combined.tsv
-│   ├── feature-table.biom
-│   └── feature-table.tsv
 └── taxonomy
     ├── taxonomy_log.txt
     ├── taxonomy.qza
     └── taxonomy.qzv
+├── version_info.txt
 ```
 
 _if you don't see the above message (notice the smiley face, ":)"), or your output directory is missing some files, it means the pipeline is not successfully run. Check with the lab's bioinformatician if the error is not obvious_
 
 #### Post Analysis
-This section is the extension of "Core Analysis" section. **It requires all the outputs from the "Core Analysis" section, so DO NOT remove any files or folders if you wish to run this section**
+This section is the extension of "Core Analysis" section. **It requires all the outputs from the "Core Analysis" section, so DO NOT remove any files or folders if you wish to run this section.**  
+
+None of the "Post Analysis" steps are time-consuming, so you may re-run this section multiple times by varying user supplied parameters (e.g. metadata, sampling-depth).
 
 ##### - Core Metrics Phylogeny -
 It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
 
-8. Generate configuration file.
+1. Generate configuration file.
 
 ```
 - General Format -
@@ -393,17 +389,54 @@ python luigi_config_generator.py \
 	--sampling-depth 10000
 ```
 
-9. Run the pipeline 
+2. Run the pipeline 
 
 ```
 python 16S_pipeline.py Core_Metrics_Phylogeny --local-scheduler
 ```
 
-**Note that you may repeat Step 8 and 9 to generate PCoA plots based on different rarefaction thresholds. Just make sure to remove "core_div_phylogeny" directory prior to do so**
+**Note that you may repeat Step 1 and 2 to generate PCoA plots based on different rarefaction thresholds. Just make sure to remove/move/rename "core_div_phylogeny" directory prior to do so.**
 
 `rm -r output/core_div_phylogeny`
 
-10. Make sure to rename or move 'output' directory to somewhere else when you are done running the pipeline.
+##### - Rarefaction -
+This step will rarefy feature table generated using DADA2 to a user specified sampling depth (or 10,000 if sampling depth not specified), and generate combined ASV table with the rarefied feature table.
+
+1. Generate configuration file.
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--metadata <PATH_TO_YOUR_METADATA_FILE> \
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
+	--sampling-depth 10000
+```
+
+2. Run the pipeline 
+
+```
+python 16S_pipeline.py Generate_Combined_Rarefied_Feature_Table --local-scheduler
+```
+
+3. Alternatively, you may run the command below to generate both PCoA plots, rarefied tables, and alpha diversity plots.
+
+```
+python 16S_pipeline.py Post_Analysis --local-scheduler
+```
+
+**Note that you may repeat Step 1 and 2 or 3 to rarefy feature table at different sampling depth. Just make sure to remove/move/rename "export_rarefy" and "rarefy" directories prior to do so.**
+
+### Cleaning Up Working Directory
+
+Make sure to rename or move 'output' directory to somewhere else when you are done running the pipeline.
 
 **by default, luigi pipeline looks at "output" directory to check for successful tasks, so if all the files already exist in this directory (e.g. from analyzing your previous samples), it will think there aren't any jobs to be run for the new samples since all the files are there.**
 
@@ -412,4 +445,4 @@ Let's say you want to move "output" directory to "Analysis" directory under the 
 
 You may run the command below to do so.
 
-`mv output ~/Analysis/Illumina_Run3` ("~" means home directory fyi)
+`mv output ~/Analysis/Illumina_Run3` ("~" means home directory)
