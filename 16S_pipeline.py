@@ -1083,6 +1083,9 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on rarefied table
+        combined_feature_table_script = os.path.join(script_dir,
+                "generate_combined_feature_table.py")
+
         cmd_rarefied = [combined_feature_table_script,
                 "-f",
                 self.input()["Convert_Rarefy_Biom_to_TSV"].path,
