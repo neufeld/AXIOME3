@@ -3,6 +3,8 @@
 # Copyright Jackson M. Tsuji, Neufeld Research Group, 2019
 # Creates a tabular summary of the total read counts of all samples in a qiime2 feature table
 
+# Modified by Daniel Min, Neufeld Research Group, 2019
+
 # Imports
 import sys
 import os
@@ -28,7 +30,7 @@ def load_qiime2_artifact(feature_table):
 
     *** NOTE: Will throw errors if the artifact type is NOT [Feature_Table] ***
     """
-    # Make sure feature_table actually exists
+    # Make sure input actually exists
     if not(os.path.isfile(feature_table)):
         msg = "Input file '{in_file}' does NOT exist!".format(
                 in_file=feature_table)
@@ -54,6 +56,9 @@ def generate_sample_count(feature_table_df):
     # Sort 'Count' column in ascending order
     feature_table_df = feature_table_df.sort_values(by=['Count'])
 
+    # Set index name
+    feature_table_df.index.name = 'SampleID'
+
     return feature_table_df
 
 def write_output(sample_count_df, output_filepath, is_verbose=True):
@@ -69,7 +74,7 @@ def write_output(sample_count_df, output_filepath, is_verbose=True):
         logger.info("Writing counts summary file to " + output_filepath)
 
         try:
-            sample_counts.to_csv(output_filepath, sep='\t', columns=['Count'])
+            sample_count_df.to_csv(output_filepath, sep='\t', columns=['Count'])
         except IOError as err:
             msg = "I/O Error: Cannot open the file {f}".format(f=output_filepath)
             logger.error(msg)
