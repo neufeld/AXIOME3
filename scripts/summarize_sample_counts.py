@@ -6,85 +6,98 @@
 # Imports
 import sys
 import os
-import shutil
 import time
 import logging
 import argparse
-import uuid
-import biom
 
-import zipfile as zf
 import pandas as pd
+# To import QIIME2 Artifacts into Python
+from qiime2 import Artifact
 
 # GLOBAL variables
 SCRIPT_VERSION = '0.8.1'
-BIOM_PATH_PARTIAL = 'data/feature-table.biom' # biom file location within the unzipped QZA file
 
 # Set up the logger
 logging.basicConfig(format="[ %(asctime)s UTC ]: %(levelname)s: %(message)s")
 logging.Formatter.converter = time.gmtime
 logger = logging.getLogger(__name__)
 
-def unpack_biom_from_qza(input_filepath, tmp_dir_base):
+def load_qiime2_artifact(feature_table):
     """
-    Unzip a BIOM file from a QIIME2 QZA archive.
+    Load the output of QIIME2 DADA2 (QIIME2 feature table artifact) into Python
 
-    :global BIOM_PATH_PARTIAL: partial path to the biom file within the QZA archive
-    :param input_filepath: Path to the QIIME2 QZA archive, FeatureTable[Frequency] format
-    :param tmp_dir_base: The base directory to extract the ZIP file to (will create a random subfolder)
-    :return: tuple of the path to the unzipped BIOM file and the path to the random temp subfolder
+    *** NOTE: Will throw errors if the artifact type is NOT [Feature_Table] ***
     """
-    logger.info("Unpacking QZA file")
-    
-    with zf.ZipFile(input_filepath, mode='r') as qza_data:
-        # Dump list of contents and determine path to the BIOM file
-        qza_data_contents = qza_data.namelist()
+    # Make sure feature_table actually exists
+    if not(os.path.isfile(feature_table)):
+        msg = "Input file '{in_file}' does NOT exist!".format(
+                in_file=feature_table)
+        raise FileNotFoundError(msg)
 
-        # Find the path to the biom file
-        # See https://stackoverflow.com/a/12845341 (accessed Sept. 12, 2019)
-        biom_filepath = list(filter(lambda x: BIOM_PATH_PARTIAL in x, qza_data_contents))
-        # TODO - check this is a list of length 1
-        logger.debug("Found biom file in QZA file at " + str(biom_filepath[0]))
-        
-        # Extract the biom file to a randomly generated subfolder in tmp_dir_base
-        tmpdir = os.path.join(tmp_dir_base, uuid.uuid4().hex)
-        logger.debug("Extracting into temp subdir " + tmpdir)
-        extraction_path = qza_data.extract(biom_filepath[0], path = tmpdir)
-        logger.debug("Extracted temp BIOM file to " + extraction_path)
-    
-    # Return the path to the BIOM file and to the random subfolder
-    biom_tmp_info = (extraction_path, tmpdir)
-    return(biom_tmp_info)
+    try:
+        feature_table_df = Artifact.load(feature_table).view(pd.DataFrame)
 
-def load_biom_df_from_qza(input_filepath, tmp_dir_base):
+        return feature_table_df
+    except Exception as err:
+        logger.error(err)
+        raise
+
+def generate_sample_count(feature_table_df):
     """
-    Load a BIOM file from a QIIME2 QZA archive as a Pandas dataframe.
-
-    :global BIOM_PATH_PARTIAL: partial path to the biom file within the QZA archive
-    :param input_filepath: Path to the QIIME2 QZA archive, FeatureTable[Frequency] format
-    :param tmp_dir_base: The base directory to extract the ZIP file to (will create a random subfolder)
-    :return: pandas DataFrame of the BIOM table's count data
+    Generate sample counts given feature table dataframe.
+    It sums up counts from each "feature"
     """
-    # Unzip the BIOM table from within the QZA (ZIP) file
-    biom_tmp_info = unpack_biom_from_qza(input_filepath, tmp_dir_base)
+    # By default, feature table dataframe stores samples as rows, and features
+    # as columns.
+    feature_table_df['Count'] = feature_table_df.sum(axis=1)
 
-    # Load biom file and convert to pandas dataframe
-    logger.info("Loading BIOM file")
-    biom_data = biom.load_table(biom_tmp_info[0])
-    biom_table = biom_data.to_dataframe()
+    # Sort 'Count' column in ascending order
+    feature_table_df = feature_table_df.sort_values(by=['Count'])
 
-    # Delete tmp dir
-    logger.debug("Removing temp dir " + biom_tmp_info[1])
-    shutil.rmtree(biom_tmp_info[1])
-    
-    return(biom_table)
+    return feature_table_df
+
+def write_output(sample_count_df, output_filepath, is_verbose=True):
+    """
+    Write output
+    """
+    # Write output
+    if(output_filepath is None):
+        # Write to STDOUT
+        logger.info("Writing counts summary file to STDOUT")
+        sample_count_df.to_csv(sys.stdout, sep='\t', columns=['Count'])
+    else:
+        logger.info("Writing counts summary file to " + output_filepath)
+
+        try:
+            sample_counts.to_csv(output_filepath, sep='\t', columns=['Count'])
+        except IOError as err:
+            msg = "I/O Error: Cannot open the file {f}".format(f=output_filepath)
+            logger.error(msg)
+            raise
+        except Exception as err:
+            logger.error(err)
+            raise
+
+def write_min_count(min_count_filepath, sample_count_df):
+        logger.info("Writing min count to " + min_count_filepath)
+
+        min_count = int(sample_count_df['Count'].min())
+        try:
+            with open(min_count_filepath, 'w') as min_count_file:
+                min_count_file.write(str(min_count) + '\n')
+        except IOError as err:
+            msg = "I/O Error: Cannot open the file {f}".format(f=min_count_filepath)
+            logger.error(msg)
+            raise
+        except Exception as err:
+            logger.error(err)
+            raise
 
 def main(args):
     # Set user variables
     input_filepath = args.input_filepath
     output_filepath = args.output_filepath
     min_count_filepath = args.min_count_filepath
-    tmp_dir_base = args.tmp_dir
     verbose = args.verbose
 
     # Set logger verbosity
@@ -97,39 +110,24 @@ def main(args):
     logger.info("Running " + os.path.basename(sys.argv[0]))
     logger.info("Version: " + SCRIPT_VERSION)
     logger.info("Input filepath: " + input_filepath)
-    logger.info("Output filepath: " + output_filepath)
+    logger.info("Output filepath: " + output_filepath\
+            if output_filepath is not None\
+            else "Output filepath: Verbose")
     logger.info("Min count filepath: " + str(min_count_filepath))
-    logger.info("Temp directory: " + tmp_dir_base)
     logger.info("Verbose logging: " + str(verbose))
 
-    # Load the BIOM table from within the QZA (ZIP) file
-    biom_table = load_biom_df_from_qza(input_filepath, tmp_dir_base)
+    # Load feature table as pandas dataframe
+    feature_table_df = load_qiime2_artifact(input_filepath)
 
-    # Sum columns
-    logger.info("Summarizing BIOM file")
-    sample_counts = biom_table.sum().to_frame(name = "count")
-    # Move sample IDs to their own column (not row IDs)    
-    # See https://stackoverflow.com/a/25457946 (accessed Sept. 12, 2019)
-    sample_counts.index.name = 'sample-id'
-    sample_counts = sample_counts.reset_index()
-    # Sort by count
-    sample_counts = sample_counts.sort_values(by = sample_counts.columns[1])
+    # Generate sample counts
+    sample_count_df = generate_sample_count(feature_table_df)
 
     # Write output
-    if output_filepath == '-':
-        # Write to STDOUT
-        logger.info("Writing counts summary file to STDOUT")
-        sample_counts.to_csv(sys.stdout, sep='\t', index=False)
-    else:
-        logger.info("Writing counts summary file to " + output_filepath)
-        sample_counts.to_csv(output_filepath, sep='\t', index=False)
+    write_output(sample_count_df, output_filepath)
 
     # Get min count and write, if desired
-    if min_count_filepath is not False:
-        logger.info("Writing min count to " + min_count_filepath)
-        min_count = int(sample_counts.iat[0,1])
-        with open(min_count_filepath, 'w') as min_count_file:
-            min_count_file.write(str(min_count) + '\n')
+    if min_count_filepath is not None:
+        write_min_count(min_count_filepath, sample_count_df)
 
     logger.info(os.path.basename(sys.argv[0]) + ": done.")
 
@@ -139,14 +137,13 @@ if __name__ == '__main__':
                                                    "Version: " + SCRIPT_VERSION)
     parser.add_argument('-i', '--input_filepath', required=True, 
                        help = 'The path to the input QZA FeatureTable file.')
-    parser.add_argument('-o', '--output_filepath', required=False, default='-', 
+    parser.add_argument('-o', '--output_filepath', required=False, default=None, 
                        help = 'The path to the output TSV file. Will write to STDOUT (-) if nothing is provided.')
-    parser.add_argument('-m', '--min_count_filepath', required=False, default=False, 
+    parser.add_argument('-m', '--min_count_filepath', required=False,
+                        default=None,
                        help = 'Optional path to write a single-line text file with the lowest count value in the dataset.')
-    parser.add_argument('-T', '--tmp_dir', required=False, default='/tmp', 
-                       help = 'Optional path to the temporary directory used for unpacking the QZA [default: /tmp].')
     parser.add_argument('-v', '--verbose', required=False, action='store_true',
                        help = 'Enable for verbose logging.')
     command_line_args = parser.parse_args()
-    
+
     main(command_line_args)
