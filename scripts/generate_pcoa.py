@@ -1,3 +1,8 @@
+"""
+Modified version of Jackson Tsuji of Neufeld Research Group's script to make PCoA plot.
+
+Written by Daniel Min, Neufeld Research Group, 2019
+"""
 from argparse import ArgumentParser
 from skbio.stats import ordination
 from qiime2 import Artifact
@@ -49,13 +54,35 @@ def args_parse():
             type=int,
             default=6)
 
+    parser.add_argument('--output', help="""
+            Path to store output as (extenstion should be .pdf)
+            """,
+            type=str,
+            default="PCoA_plot.pdf")
+
     return parser
 
 def convert_qiime2_2_skbio(pcoa_artifact):
     """
     Convert QIIME2 PCoA artifact to skbio OrdinationResults object.
+
+    ** Will throw errors if the artifact type is NOT PCoAResults **
+    You may check Artifact type by checking the "type" property of the Artifact
+    object after loading the artifact via 'Artifact.load(artifact)'
     """
-    pcoa = Artifact.load(pcoa_artifact).view(ordination.OrdinationResults)
+    try:
+        pcoa_artifact = Artifact.load(pcoa_artifact)
+
+        # Check Artifact type
+        if(str(pcoa_artifact.type) != "PCoAResults"):
+            msg = "Input QIIME2 Artifact is not of the type 'PCoAResults'!"
+            raise ValueError(msg)
+
+        pcoa = pcoa_artifact.view(ordination.OrdinationResults)
+    except ValueError:
+        raise
+    except Exception:
+        raise
 
     # Rename PCoA coordinates index (so left join can be performed later)
     coords = pcoa.samples
@@ -113,7 +140,7 @@ def generate_pcoa_plot(pcoa,
         shape_variable=None,
         point_size=6):
 
-    # Left join metadata file with ordinations
+    # Inner join metadata file with ordinations
     pcoa_coords = pcoa.samples
     pcoa_data_samples = pd.merge(
             pcoa_coords,
@@ -193,6 +220,29 @@ def generate_pcoa_plot(pcoa,
 
     return pcoa_plot
 
+def save_plot(pcoa_plot, output_pdf_filepath):
+    # Save the plot
+    # Add .pdf extension if not specified or other extensions are provided
+    if not (output_pdf_filepath.endswith('.pdf')):
+        file_name, file_ext = os.path.splitext(output_pdf_filepath)
+
+        # Replace extension with .pdf if exists and not .pdf
+        if(file_ext and file_ext != '.pdf'):
+            output_pdf_filepath = file_name + '.pdf'
+        # Add .pdf if extension does not exist
+        else:
+            output_pdf_filepath = output_pdf_filepath + '.pdf'
+
+    # Plot size
+    pdf_width_mm = 100
+    pdf_height_mm = 90
+
+    pcoa_plot.save(
+             output_pdf_filepath,
+             width=pdf_width_mm,
+             height=pdf_height_mm,
+             units='mm')
+
 if __name__ == "__main__":
     parser = args_parse()
 
@@ -209,6 +259,7 @@ if __name__ == "__main__":
     # Load metadata
     metadata_df = load_metadata(args.metadata)
 
+    # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
             pcoa = pcoa,
             metadata_df = metadata_df,
@@ -217,13 +268,5 @@ if __name__ == "__main__":
             point_size = args.point_size)
 
     # Save the plot
-    output_pdf_filepath = "PCoA_plot.pdf"
-    # Plot size
-    pdf_width_mm = 100
-    pdf_height_mm = 90
-
-    pcoa_plot.save(
-             output_pdf_filepath,
-             width=pdf_width_mm,
-             height=pdf_height_mm,
-             units='mm')
+    output_path = args.output
+    save_plot(pcoa_plot, output_path)

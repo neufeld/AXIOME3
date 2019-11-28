@@ -1,4 +1,5 @@
 # Custom module
+# Slightly modified version of generate_pcoa.py
 from generate_pcoa import *
 
 # Colour formatters

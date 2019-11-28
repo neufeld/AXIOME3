@@ -28,7 +28,9 @@ def load_qiime2_artifact(feature_table):
     """
     Load the output of QIIME2 DADA2 (QIIME2 feature table artifact) into Python
 
-    *** NOTE: Will throw errors if the artifact type is NOT [Feature_Table] ***
+    ** Will throw errors if the artifact type is NOT FeatureTable[Frequency] **
+    You may check Artifact type by checking the "type" property of the Artifact
+    object after loading the artifact via 'Artifact.load(artifact)'
     """
     # Make sure input actually exists
     if not(os.path.isfile(feature_table)):
@@ -37,9 +39,19 @@ def load_qiime2_artifact(feature_table):
         raise FileNotFoundError(msg)
 
     try:
-        feature_table_df = Artifact.load(feature_table).view(pd.DataFrame)
+        feature_table_artifact = Artifact.load(feature_table)
+
+        # Check Artifact type
+        if(str(feature_table_artifact.type) != "FeatureTable[Frequency]"):
+            msg = "Input QIIME2 Artifact is not of the type 'FeatureTable[Frequency]'!"
+            raise ValueError(msg)
+
+        feature_table_df = feature_table_artifact.view(pd.DataFrame)
 
         return feature_table_df
+    except ValueError as err:
+        logger.error(err)
+        raise
     except Exception as err:
         logger.error(err)
         raise
