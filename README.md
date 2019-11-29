@@ -32,11 +32,11 @@ git clone https://github.com/neufeld/AXIOME3.git
 
 3.a. In this case, you can install conda environment directly from .yml file in this repository.
 
-`conda env create --name <ENV_NAME> --file conda_env_file/AXIOME3.yml`
+`conda env create --name <ENV_NAME> --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
 
 *Make sure to replace <ENV_NAME> with actual name*
 
-e.g. `conda env create --name qiime_luigi --file conda_env_file/AXIOME3.yml`
+e.g. `conda env create --name qiime_luigi --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
 
 Then, go to Step 4. (Activate your qiime2 environment)
 
