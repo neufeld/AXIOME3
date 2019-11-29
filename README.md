@@ -529,6 +529,8 @@ python 16S_pipeline.py PCoA_Plots --local-scheduler
 
 This should generate `pcoa_plots` directory with its respective outputs.
 
+3. Note that this output may not necessarilly be "publication quality" plot. You may run a separate script to make a nicer quality PCoA plot. Refer to [generate_pcoa.py guideline](scripts/README.md) for more details.
+
 ### - Running all Post Analysis Steps -
 
 Alternatively, you may run the commands below to generate all the outputs in the "Post Analysis" section.
