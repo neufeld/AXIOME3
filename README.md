@@ -137,11 +137,11 @@ RBH13,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/46_S46_L001_R2_001.fastq.gz,re
 
 **If "run_ID" column is NOT present in the manifest file, the pipeline will assume all the samples come from the same run**
 
-#### Core Analysis
+## Core Analysis
 
 This section covers core part of 16S rRNA analysis workflow that most people would want to run. 
 
-0. Activate conda environment and cd to Neufeld-16S-Pipeline (if you haven't already done so).
+0. Activate conda environment and cd to AXIOME3 (if you haven't already done so).
 
 1. Generate configuration file by running luigi_config_generator.py.
 
@@ -161,7 +161,31 @@ python luigi_config_generator.py \
 	--input-format PairedEndFastqManifestPhred33
 ```
 
-Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default values.  
+You may refer to `https://docs.qiime2.org/2019.10/tutorials/importing/` (open the document from latest version) for more information regarding `sample-type` and `input-format`.
+
+At the Neufeld Lab, `sample-type` will often be `SampleData[PairedEndSequencesWithQuality]`, and `input-format` is either `PairedEndFastqManifestPhred33` or `PairedEndFastqManifestPhred33V2` depending on the format of manifest file you are using.
+
+*(Manifest file can be in either CSV or TSV formats)*
+
+**Example of PairedEndFastqManifestPhred33 manifest file**
+```
+sample-id,absolute-filepath,direction
+RBH08,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/41_S41_L001_R1_001.fastq.gz,forward
+RBH08,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/41_S41_L001_R2_001.fastq.gz,reverse
+RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R1_001.fastq.gz,forward
+RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R2_001.fastq.gz,reverse
+```
+
+**Example of PairedEndFastqManifestPhred33V manifest file**
+```
+sample-id     forward-absolute-filepath       reverse-absolute-filepath
+sample-1      $PWD/some/filepath/sample0_R1.fastq.gz  $PWD/some/filepath/sample1_R2.fastq.gz
+sample-2      $PWD/some/filepath/sample2_R1.fastq.gz  $PWD/some/filepath/sample2_R2.fastq.gz
+sample-3      $PWD/some/filepath/sample3_R1.fastq.gz  $PWD/some/filepath/sample3_R2.fastq.gz
+sample-4      $PWD/some/filepath/sample4_R1.fastq.gz  $PWD/some/filepath/sample4_R2.fastq.gz
+```
+
+**Note that *you don't have to* specify `--sample-type` and `--input-format` if you're okay with the default values.** 
 If this is the case, simply run
 
 ```
@@ -212,7 +236,7 @@ There are maximum values for cutoff values for **trunc-len-f and trunc-len-r** i
 
 **Note that the illustrated amplicon is specific to the Neufeld Lab. Maximum cutoff values may differ if using different amplicons and/or sequencing technology**
 
-![alt text](https://github.com/neufeld/AXIOME3/blob/master/img/amplicon.jpeg "Amplicon DADA2 Cutoff Reference")
+![alt text](https://github.com/neufeld/AXIOME3/blob/master/img/amplicon.jpeg "DADA2 Amplicon Cutoff Reference")
 
 3. After determining denoise cutoff values, generate configuration file again to specify cutoff values.
 
@@ -254,11 +278,30 @@ python luigi_config_generator.py \
 
 4. Run the pipeline to denoise your reads. This step acts as the 2nd checkpoint since denoising takes the most amount of time during 16S rRNA analysis. (could take 10~50min depending on the number of samples)
 
+
+`python 16S_pipeline.py Merge_Denoise --local-scheduler`
+
+
+When it's done running, your output directory will look something like this.  
+
+
 ```
-python 16S_pipeline.py Merge_Denoise --local-scheduler
+output/dada2/
+├── dada2_log.txt
+├── dada2_rep_seqs.qza
+├── dada2_table.qza
+├── merged
+│   ├── merged_dada2_rep_seqs.qzv
+│   ├── merged_rep_seqs.qza
+│   └── merged_table.qza
+├── sample_counts.tsv
+├── stats_dada2.qza
+└── stats_dada2.qzv
 ```
 
-When it's done running, your screen should look something like this (takes some time to run)
+You may examine 'sample_counts.tsv' file to determine sub-sampling depth value for the post analysis steps (e.g. rarefaction, distance metrics, PCoA, alpha significance groups)
+
+**_Note that 'merged_table.qza' will be identical to 'dada2_table.qza' if all your samples are from SINGLE Illumina run._**
 
 5. Generate configuration file again (to finish the rest of the workflow).
 
@@ -363,13 +406,15 @@ output
 
 _if you don't see the above message (notice the smiley face, ":)"), or your output directory is missing some files, it means the pipeline is not successfully run. Check with the lab's bioinformatician if the error is not obvious_
 
-#### Post Analysis
+## Post Analysis
 This section is the extension of "Core Analysis" section. **It requires all the outputs from the "Core Analysis" section, so DO NOT remove any files or folders if you wish to run this section.**  
 
 None of the "Post Analysis" steps are time-consuming, so you may re-run this section multiple times by varying user supplied parameters (e.g. metadata, sampling-depth).
 
-##### - Core Metrics Phylogeny -
+### - Core Metrics Phylogeny -
 It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
+
+**Note that you may repeat any of the "Post Analysis" steips based on different sampling-depth thresholds. Just make sure to remove/move/rename corresponding directories prior to do so.**
 
 1. Generate configuration file.
 
@@ -397,11 +442,7 @@ python 16S_pipeline.py Core_Metrics_Phylogeny --local-scheduler
 
 This should create `core_div_phylogeny` directory with its respective outputs.
 
-**Note that you may repeat Step 1 and 2 to generate PCoA plots based on different rarefaction thresholds. Just make sure to remove/move/rename "core_div_phylogeny" directory prior to do so.**
-
-`rm -r output/core_div_phylogeny`
-
-##### - Rarefaction -
+### - Rarefaction -
 This step will rarefy feature table generated using DADA2 to a user specified sampling depth (or 10,000 if sampling depth not specified), and generate combined ASV table with the rarefied feature table.
 
 1. Generate configuration file.
@@ -430,22 +471,93 @@ python 16S_pipeline.py Generate_Combined_Rarefied_Feature_Table --local-schedule
 
 This should generate `rarefy_exported` and `rarefy` directories with their respective outputs.
 
-3. Alternatively, you may run the command below to generate both PCoA plots, rarefied tables, and alpha diversity plots.
+### - Alpha Group Significance -
+This step can be used to explore the relationship between alpha diversity and the user provided metadata. (Output will be QIIME2 Zipped View (.qzv)). You may go to `https://view.qiime2.org/` to examine this file
+
+1. Generate configuration file.
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--metadata <PATH_TO_YOUR_METADATA_FILE> \
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
+	--sampling-depth 10000
+```
+
+2. Run the pipeline 
+
+```
+python 16S_pipeline.py Alpha_Group_Significance --local-scheduler
+```
+
+This should generate `alpha_group_significance` directory with its respective outputs.
+
+### - 2D PCoA Plots -
+This step will generate multiple 2D PCoA plots, each of which corresponds to a column in the user provided metadata file, for multiple distance metrics (unweighted/weighted unifrac, bray-curtis, jaccard) in a PDF format.
+
+1. Generate configuration file.
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--metadata <PATH_TO_YOUR_METADATA_FILE> \
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
+	--sampling-depth 10000
+```
+
+2. Run the pipeline 
+
+```
+python 16S_pipeline.py PCoA_Plots --local-scheduler
+```
+
+This should generate `pcoa_plots` directory with its respective outputs.
+
+### - Running all Post Analysis Steps -
+
+Alternatively, you may run the commands below to generate all the outputs in the "Post Analysis" section.
+
+1. Generate configuration file.
+
+```
+- General Format -
+
+python luigi_config_generator.py \
+	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
+	--metadata <PATH_TO_YOUR_METADATA_FILE> \
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+-----------------------------------------------------------------------------
+- Actual Example -
+	
+python luigi_config_generator.py \
+	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
+	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
+	--sampling-depth 10000
+```
+
+2. Run the pipeline 
 
 ```
 python 16S_pipeline.py Post_Analysis --local-scheduler
 ```
 
 This should create `rarefy_exported`, `rarefy`, `core_div_phylogeny` and `alpha_group_significance` directories with their respective outputs.
-
-**Note that you may repeat Step 1 and 2 (or 3) to rarefy feature table at different sampling depth. Just make sure to remove/move/rename "rarefy_exported" and "rarefy" directories prior to do so.**
-
-
-`rm -r output/rarefy output/rarefy_exported`
-
-_In case you want to re-run step 3, you should remove directories with the following commands instead_
-
-`rm -r output/rarefy output/rarefy_exported output/core_div_phylogeny output/alpha_group_significance`
 
 ### Cleaning Up Working Directory
 
