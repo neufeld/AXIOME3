@@ -136,8 +136,6 @@ dependencies:
   - mafft=7.310=he1b5a44_3
   - make=4.2.1=h14c3975_2004
   - markupsafe=1.1.1=py36h516909a_0
-  - matplotlib=3.1.0=py36_1
-  - matplotlib-base=3.1.0=py36hfd891ef_1
   - mistune=0.8.4=py36h516909a_1000
   - more-itertools=7.2.0=py_0
   - msgpack-python=0.6.2=py36hc9558a2_0
@@ -385,8 +383,13 @@ dependencies:
   - zlib=1.2.11=h516909a_1006
   - zstd=1.4.3=h3b9ef0a_0
   - pip:
+    - descartes==1.1.0
     - docutils==0.15.2
     - luigi==2.8.10
+    - matplotlib==3.1.2
+    - mizani==0.6.0
+    - palettable==3.3.0
+    - plotnine==0.6.0
     - python-daemon==2.1.2
     - tornado==5.1.1
 prefix: /Winnebago/danielm710/anaconda3/envs/qiime2-2019.10
