@@ -559,15 +559,6 @@ python 16S_pipeline.py Post_Analysis --local-scheduler
 
 This should create `rarefy_exported`, `rarefy`, `core_div_phylogeny` and `alpha_group_significance` directories with their respective outputs.
 
-**Note that you may repeat Step 1 and 2 (or 3) to rarefy feature table at different sampling depth. Just make sure to remove/move/rename "rarefy_exported" and "rarefy" directories prior to do so.**
-
-
-`rm -r output/rarefy output/rarefy_exported`
-
-_In case you want to re-run step 3, you should remove directories with the following commands instead_
-
-`rm -r output/rarefy output/rarefy_exported output/core_div_phylogeny output/alpha_group_significance`
-
 ### Cleaning Up Working Directory
 
 Make sure to rename or move 'output' directory to somewhere else when you are done running the pipeline.
