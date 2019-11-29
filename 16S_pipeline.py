@@ -94,6 +94,7 @@ class Output_Dirs(luigi.Config):
     core_metric_dir = os.path.join(out_dir, "core_div_phylogeny")
     visualization_dir = os.path.join(out_dir, "visualization")
     alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
+    pcoa_dir = os.path.join(out_dir, "pcoa_plots")
 
 class Samples(luigi.Config):
     """
@@ -568,6 +569,36 @@ class Merge_Denoise(luigi.Task):
                     self.output()['rep_seqs'].path],
                     self)
 
+class Sample_Count_Summary(luigi.Task):
+    out_dir = Output_Dirs().denoise_dir
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        summary_file = os.path.join(self.out_dir, "sample_counts.tsv")
+
+        return luigi.LocalTarget(summary_file)
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.out_dir],
+                self)
+
+        # Run Jackson's count summary script
+        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
+
+        cmd = ['python',
+                count_script,
+                '--input_filepath',
+                self.input()['table'].path,
+                '--output_filepath',
+                self.output().path]
+
+        run_cmd(cmd, self)
+
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
     n_jobs = luigi.Parameter(default="10")
@@ -780,8 +811,6 @@ class Generate_Combined_Feature_Table(luigi.Task):
         with self.output()["log"].open('w') as fh:
             fh.write(logged_pre_rarefied)
 
-# Post Analysis
-# Most of these require rarefaction depth as a user parameter
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
 
@@ -831,8 +860,11 @@ class Phylogeny_Tree(luigi.Task):
 
         run_cmd(cmd, self)
 
+# Post Analysis
+# Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
+    metadata_file = Samples().metadata_file
 
     def requires(self):
         return {
@@ -897,6 +929,15 @@ class Core_Metrics_Phylogeny(luigi.Task):
         return out
 
     def run(self):
+        # Make sure Metadata file is provided and exists
+        if not(os.path.isfile(self.metadata_file)):
+            msg = dedent("""
+                    Metadata file is not provided or the provided Metadata file
+                    does not exist!
+                    """)
+
+            raise FileNotFoundError(msg)
+
         # Create output directory
         run_cmd(['mkdir',
                 '-p',
@@ -1325,6 +1366,74 @@ class Alpha_Group_Significance(luigi.Task):
 
             run_cmd(cmd, self)
 
+class PCoA_Plots(luigi.Task):
+    pcoa_dir = Output_Dirs().pcoa_dir
+    metadata_file = Samples().metadata_file
+
+    def requires(self):
+        return Core_Metrics_Phylogeny()
+
+    def output(self):
+        unweighted_unifrac_pcoa = os.path.join(self.pcoa_dir,
+                "unweighted_unifrac_pcoa_plots.pdf")
+        weighted_unifrac_pcoa = os.path.join(self.pcoa_dir,
+                "weighted_unifrac_pcoa_plots.pdf")
+        bray_curtis_pcoa = os.path.join(self.pcoa_dir,
+                "bray_curtis_pcoa_plots.pdf")
+        jaccard_pcoa = os.path.join(self.pcoa_dir,
+                "jaccard_pcoa_plots.pdf")
+
+        output = {
+                'unweighted_unifrac_pcoa':
+                luigi.LocalTarget(unweighted_unifrac_pcoa),
+                'weighted_unifrac_pcoa':
+                luigi.LocalTarget(weighted_unifrac_pcoa),
+                'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
+                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa)
+                }
+
+        return output
+
+    def run(self):
+        # Make sure Metadata file is provided and exists
+        if not(os.path.isfile(self.metadata_file)):
+            msg = dedent("""
+                    Metadata file is not provided or the provided Metadata file
+                    does not exist!
+                    """)
+
+            raise FileNotFoundError(msg)
+
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.pcoa_dir],
+                self)
+
+        # Input PCoA artifacts to loop through
+        # (It's identical to output keys!)
+        metrics = ['unweighted_unifrac_pcoa', 'weighted_unifrac_pcoa',
+                'jaccard_pcoa', 'bray_curtis_pcoa']
+
+        # Make PCoA plots for each distance metric
+        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
+        for metric in metrics:
+            outdir = os.path.dirname(self.output()[metric].path)
+            filename = os.path.basename(self.output()[metric].path)
+
+            cmd = ['python',
+                    pcoa_plot_script,
+                    '--pcoa-qza',
+                    self.input()[metric].path,
+                    '--metadata',
+                    self.metadata_file,
+                    '--file-name',
+                    filename,
+                    '--output-dir',
+                    outdir]
+
+            run_cmd(cmd, self)
+
 # Get software version info
 class Get_Version_Info(luigi.Task):
     out_dir = Output_Dirs().out_dir
@@ -1364,6 +1473,7 @@ class Core_Analysis(luigi.Task):
                 Generate_Combined_Feature_Table(),
                 Phylogeny_Tree(),
                 Denoise_Tabulate(),
+                Sample_Count_Summary(),
                 Sequence_Tabulate(),
                 Taxonomy_Tabulate(),
                 Get_Version_Info()
@@ -1382,6 +1492,7 @@ class Post_Analysis(luigi.Task):
                 Core_Metrics_Phylogeny(),
                 Alpha_Group_Significance(),
                 Generate_Combined_Rarefied_Feature_Table(),
+                PCoA_Plots(),
                 Get_Version_Info()
         ]
 
