@@ -24,7 +24,7 @@ cd ~
 git clone https://github.com/neufeld/AXIOME3.git
 ```
 
-2. Change to AXIOME3
+2. Change directory to AXIOME3.
 
 `cd AXIOME3`
 
@@ -38,15 +38,15 @@ git clone https://github.com/neufeld/AXIOME3.git
 
 e.g. `conda env create --name qiime_luigi --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
 
-Then, go to Step 4. (Activate your qiime2 environment)
+Then, go to Step 4. (Activate your AXIOME3 environment)
 
 ### You already have an existing conda environment for qiime2 version 2019-07 AND don't mind updating the existing environment
 <br />
 3.b. In this case, you should just do...
 
-##### i) activate your qiime environment 
+##### i) activate your AXIOME3 environment 
 
-`conda activate <YOUR_QIIME_ENV>`
+`conda activate <YOUR_AXIOME3_ENV>`
 
 ##### ii) Make sure pip and python are pointing to anaconda packages **not to /usr/bin**
 
@@ -66,9 +66,9 @@ If you still get different messages, ask lab bioinformaticians for help.
 
 `conda install -c bioconda biopython pandas`
 	
-4. Activate your qiime2 environment (if you already activated, ignore this step).
+4. Activate your AXIOME3 environment (if you already activated, ignore this step).
 
-`conda activate <QIIME_ENV>` (Replace <QIIME_ENV> with the environment name you chose)
+`conda activate <AXIOME3_ENV>` (Replace <AXIOME3_ENV> with the environment name you chose)
 
 ## Usage
 
@@ -141,7 +141,7 @@ RBH13,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/46_S46_L001_R2_001.fastq.gz,re
 
 This section covers core part of 16S rRNA analysis workflow that most people would want to run. 
 
-0. Activate conda environment and cd to AXIOME3 (if you haven't already done so).
+0. Activate AXIOME3 conda environment and cd to AXIOME3 (if you haven't already done so).
 
 1. Generate configuration file by running luigi_config_generator.py.
 
