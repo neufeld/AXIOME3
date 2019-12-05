@@ -1,9 +1,9 @@
-# Neufeld lab 16S RNA analysis pipeline
+# AXIOME3 (16S rRNA analysis pipeline)
 
 ## About
-16S RNA analysis workflow based on QIIME2 wrapped in luigi framework.
+16S rRNA analysis workflow based on QIIME2 wrapped in luigi framework.
 
-Currently, it uses conda 4.7.12 and QIIME2 version 2019-07.
+Currently, it uses conda 4.7.12 and QIIME2 version 2019-10.
 
 Be aware that this repository is going through rapid changes in case you plan to actively make use of this project.
 
@@ -11,9 +11,9 @@ Be aware that this repository is going through rapid changes in case you plan to
 
 ## Required packages
 **conda 4.7.12 or newer** (No guarantee previous versions of conda will work!)  
-**QIIME2 (tested with 2019-04 and 2019-07)**
+**QIIME2 (tested with 2019-04, 2019-07, 2019-10)**
 
-Refer to 16S-luigi.yml file for details.
+Refer to `conda_env_file/qiime2-2019.10_AXIOME3.yml` file for details.
 
 ## Setting up conda virtual environment (only has to be done once)
 
@@ -28,7 +28,7 @@ git clone https://github.com/neufeld/AXIOME3.git
 
 `cd AXIOME3`
 
-### You don't have a qiime virtual environment yet OR You want to create a new conda environment for the pipeline
+### You don't have a QIIME2 virtual environment yet OR You want to create a new conda environment for the pipeline
 
 3.a. In this case, you can install conda environment directly from .yml file in this repository.
 
@@ -40,7 +40,7 @@ e.g. `conda env create --name qiime_luigi --file conda_env_file/qiime2-2019.10_A
 
 Then, go to Step 4. (Activate your AXIOME3 environment)
 
-### You already have an existing conda environment for qiime2 version 2019-07 AND don't mind updating the existing environment
+### You already have an existing conda environment for QIIME2 version 2019-10 AND don't mind updating the existing environment
 <br />
 3.b. In this case, you should just do...
 
