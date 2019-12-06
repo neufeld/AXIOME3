@@ -176,7 +176,7 @@ RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R1_001.fastq.gz,fo
 RBH09,/Data/Katja/Illumina_MiSeq_data/180924_NWMO/42_S42_L001_R2_001.fastq.gz,reverse
 ```
 
-**Example of PairedEndFastqManifestPhred33V manifest file**
+**Example of PairedEndFastqManifestPhred33V2 manifest file**
 ```
 sample-id     forward-absolute-filepath       reverse-absolute-filepath
 sample-1      $PWD/some/filepath/sample0_R1.fastq.gz  $PWD/some/filepath/sample1_R2.fastq.gz
