@@ -15,7 +15,7 @@ Be aware that this repository is going through rapid changes in case you plan to
 
 Refer to `conda_env_file/qiime2-2019.10_AXIOME3.yml` file for details.
 
-## Setting up conda virtual environment (only has to be done once)
+## Setting up conda environment for AXIOME3 (only has to be done once)
 
 1. Clone this repository to your home directory.
 
@@ -28,47 +28,34 @@ git clone https://github.com/neufeld/AXIOME3.git
 
 `cd AXIOME3`
 
-### You don't have a QIIME2 virtual environment yet OR You want to create a new conda environment for the pipeline
-
-3.a. In this case, you can install conda environment directly from .yml file in this repository.
+3. Install conda environment directly from .yml file in this repository.
 
 `conda env create --name <ENV_NAME> --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
 
-*Make sure to replace <ENV_NAME> with actual name*
+*Make sure to replace <ENV_NAME> with actual name*  
+*Try to give meaningful names such as AXIOME3_2019.10 so that you can easily switch between environments with different AXIOME3 versions*
 
-e.g. `conda env create --name qiime_luigi --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
-
-Then, go to Step 4. (Activate your AXIOME3 environment)
-
-### You already have an existing conda environment for QIIME2 version 2019-10 AND don't mind updating the existing environment
-<br />
-3.b. In this case, you should just do...
-
-##### i) activate your AXIOME3 environment 
-
-`conda activate <YOUR_AXIOME3_ENV>`
-
-##### ii) Make sure pip and python are pointing to anaconda packages **not to /usr/bin**
-
-`which pip` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/pip`
-
-`which python` should display something like `/Winnebago/danielm710/anaconda3/envs/qiime2-2019.7/bin/python`
-
-If you get something different (for example `/usr/local/bin/pip`, and `/usr/bin/python`), check if you have activated conda environment.
-
-If you still get different messages, ask lab bioinformaticians for help.
-
-##### iii) Install luigi by running the command...
-
-`pip install luigi`
-
-##### iv) Install BioPython and pandas (Jackson's script depends on these packages)
-
-`conda install -c bioconda biopython pandas`
+e.g. `conda env create --name AXIOME3_2019.10 --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
 	
 4. Activate your AXIOME3 environment (if you already activated, ignore this step).
 
 `conda activate <AXIOME3_ENV>` (Replace <AXIOME3_ENV> with the environment name you chose)
+
+## Updating existing AXIOME3 environment to latest version
+
+1. Activate existing AXIOME3 environment
+
+```
+conda activate <AXIOME3_ENV>
+```
+
+*replace <AXIOME3_ENV> with actual name*
+
+2. Update the environment from .yml file
+
+```
+conda env update --file conda_env_file/qiime2-2019.10_AXIOME3.yml
+```
 
 ## Usage
 
@@ -414,7 +401,7 @@ None of the "Post Analysis" steps are time-consuming, so you may re-run this sec
 ### - Core Metrics Phylogeny -
 It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
 
-**Note that you may repeat any of the "Post Analysis" steips based on different sampling-depth thresholds. Just make sure to remove/move/rename corresponding directories prior to do so.**
+**Note that you may repeat any of the "Post Analysis" steps based on different sampling-depth thresholds. Just make sure to remove/move/rename corresponding directories prior to do so.**
 
 1. Generate configuration file.
 
