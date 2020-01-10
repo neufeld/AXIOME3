@@ -26,20 +26,31 @@ git clone https://github.com/neufeld/AXIOME3.git
 
 2. Change directory to AXIOME3.
 
-`cd AXIOME3`
+```
+cd AXIOME3
+```
 
 3. Install conda environment directly from .yml file in this repository.
 
-`conda env create --name <ENV_NAME> --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
+```
+conda env create --name <ENV_NAME> --file conda_env_file/qiime2-2019.10_AXIOME3.yml
+```
 
 *Make sure to replace <ENV_NAME> with actual name*  
 *Try to give meaningful names such as AXIOME3_2019.10 so that you can easily switch between environments with different AXIOME3 versions*
 
-e.g. `conda env create --name AXIOME3_2019.10 --file conda_env_file/qiime2-2019.10_AXIOME3.yml`
+```
+e.g.
+conda env create --name AXIOME3_2019.10 --file conda_env_file/qiime2-2019.10_AXIOME3.yml
+```
 	
 4. Activate your AXIOME3 environment (if you already activated, ignore this step).
 
-`conda activate <AXIOME3_ENV>` (Replace <AXIOME3_ENV> with the environment name you chose)
+```
+conda activate <AXIOME3_ENV>
+
+(Replace <AXIOME3_ENV> with the environment name you chose)
+``` 
 
 ## Updating existing AXIOME3 environment to latest version
 1. Update the local repository by running the command
