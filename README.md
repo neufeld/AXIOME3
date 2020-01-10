@@ -42,8 +42,15 @@ e.g. `conda env create --name AXIOME3_2019.10 --file conda_env_file/qiime2-2019.
 `conda activate <AXIOME3_ENV>` (Replace <AXIOME3_ENV> with the environment name you chose)
 
 ## Updating existing AXIOME3 environment to latest version
+1. Update the local repository by running the command
 
-1. Activate existing AXIOME3 environment
+```
+git pull
+```
+
+*This command will download the latest updates to your local computers*
+
+2. Activate existing AXIOME3 environment
 
 ```
 conda activate <AXIOME3_ENV>
@@ -51,7 +58,7 @@ conda activate <AXIOME3_ENV>
 
 *replace <AXIOME3_ENV> with actual name*
 
-2. Update the environment from .yml file
+3. Update the environment from .yml file
 
 ```
 conda env update --file conda_env_file/qiime2-2019.10_AXIOME3.yml
