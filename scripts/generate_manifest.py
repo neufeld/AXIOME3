@@ -244,8 +244,7 @@ if __name__ == "__main__":
     # Get manifest file content
     manifest_lines, _, _ = generate_manifest(
             samplesheet_processed,
-            args.data_dir,
-            formatters)
+            args.data_dir)
 
     sorted_manifest = sorted(manifest_lines,
             key=lambda x:
