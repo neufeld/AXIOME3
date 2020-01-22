@@ -180,6 +180,19 @@ def parse_silva_taxonomy_entry(taxonomy_entry, resolve = True):
 
     return (taxonomy_split)
 
+def add_row_id(feature_table):
+    """
+    Add numerical row ID to feature table as the first column
+    """
+    num_rows = feature_table.shape[0]
+    row_id_col = [i for i in range(0, num_rows)]
+
+    # Insert id column in the beginning
+    feature_table.insert(0, column="rowID", value=row_id_col)
+
+    return feature_table
+
+
 def main(args):
     # Set user variables
     feature_table_filepath = args.feature_table
@@ -243,6 +256,9 @@ def main(args):
         # Bind to main table in place of 'Consensus.Lineage'
         feature_table = pd.concat([feature_table, taxonomy_table_parsed], axis=1, sort=False)
         feature_table = feature_table.drop(columns='Consensus.Lineage')
+
+    # Add row IDs as column in the beginning
+    feature_table = add_row_id(feature_table)
 
     # Add representative sequences
     if rep_seq_filepath is not False:
