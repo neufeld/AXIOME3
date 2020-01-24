@@ -296,12 +296,10 @@ output/dada2/
 ├── dada2_rep_seqs.qza
 ├── dada2_table.qza
 ├── merged
-│   ├── merged_dada2_rep_seqs.qzv
 │   ├── merged_rep_seqs.qza
 │   └── merged_table.qza
 ├── sample_counts.tsv
 ├── stats_dada2.qza
-└── stats_dada2.qzv
 ```
 
 You may examine 'sample_counts.tsv' file to determine sub-sampling depth value for the post analysis steps (e.g. rarefaction, distance metrics, PCoA, alpha significance groups)
