@@ -152,7 +152,7 @@ dependencies:
   - openjdk=11.0.1
   - openssl=1.1.1d
   - packaging=19.2
-  - pandas=0.25.3
+  - pandas=0.25.2
   - pandoc=2.7.3
   - pandocfilters=1.4.2
   - pango=1.40.14
