@@ -23,6 +23,9 @@ formatters = {
 # Script directory
 script_dir = "scripts"
 
+# QIIME2 helper directory
+qiime2_helper_dir = os.path.join(script_dir, "qiime2_helper")
+
 def run_cmd(cmd, step):
     #try:
     #    output = check_output(cmd)
@@ -156,7 +159,7 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(script_dir,
+            split_script = os.path.join(qiime2_helper_dir,
                     "split_manifest_file_by_run_ID.py")
 
             cmd = ['python',
@@ -588,7 +591,7 @@ class Sample_Count_Summary(luigi.Task):
                 self)
 
         # Run Jackson's count summary script
-        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
+        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
 
         cmd = ['python',
                 count_script,
@@ -792,7 +795,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
+        combined_feature_table_script = os.path.join(qiime2_helper_dir,
                 "generate_combined_feature_table.py")
 
         cmd_pre_rarefied = [combined_feature_table_script,
@@ -1124,7 +1127,7 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
+        combined_feature_table_script = os.path.join(qiime2_helper_dir,
                 "generate_combined_feature_table.py")
 
         cmd_rarefied = [combined_feature_table_script,
@@ -1416,7 +1419,7 @@ class PCoA_Plots(luigi.Task):
                 'jaccard_pcoa', 'bray_curtis_pcoa']
 
         # Make PCoA plots for each distance metric
-        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
+        pcoa_plot_script = os.path.join(qiime2_helper_dir, "generate_multiple_pcoa.py")
         for metric in metrics:
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
