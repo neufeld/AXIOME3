@@ -26,6 +26,9 @@ script_dir = "scripts"
 # QIIME2 helper directory
 qiime2_helper_dir = os.path.join(script_dir, "qiime2_helper")
 
+# FAPROTAX directory with database file and script
+FAPROTAX = "FAPROTAX"
+
 def run_cmd(cmd, step):
     #try:
     #    output = check_output(cmd)
@@ -98,6 +101,7 @@ class Output_Dirs(luigi.Config):
     visualization_dir = os.path.join(out_dir, "visualization")
     alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(out_dir, "pcoa_plots")
+    faprotax_dir = os.path.join(out_dir, "FAPROTAX")
 
 class Samples(luigi.Config):
     """
@@ -159,7 +163,7 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(qiime2_helper_dir,
+            split_script = os.path.join(script_dir,
                     "split_manifest_file_by_run_ID.py")
 
             cmd = ['python',
@@ -591,7 +595,7 @@ class Sample_Count_Summary(luigi.Task):
                 self)
 
         # Run Jackson's count summary script
-        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
+        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
 
         cmd = ['python',
                 count_script,
@@ -795,7 +799,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
+        combined_feature_table_script = os.path.join(script_dir,
                 "generate_combined_feature_table.py")
 
         cmd_pre_rarefied = [combined_feature_table_script,
@@ -1127,7 +1131,7 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
+        combined_feature_table_script = os.path.join(script_dir,
                 "generate_combined_feature_table.py")
 
         cmd_rarefied = [combined_feature_table_script,
@@ -1144,6 +1148,106 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
 
         with self.output()["rarefied_log"].open('w') as fh:
             fh.write(logged_rarefied)
+
+class Subset_ASV_By_Abundance(luigi.Task):
+    """
+    Subsets ASV table by % abundance
+    """
+    export_dir = Output_Dirs().export_dir
+    # Abundance threshold. Default is 1%
+    threshold = luigi.Parameter(default="0.01")
+
+    def requires(self):
+        return Generate_Combined_Feature_Table()
+
+    def output(self):
+        abundance_subset = os.path.join(self.export_dir, "ASV_abundance_filtered.tsv")
+
+        return luigi.LocalTarget(abundance_subset)
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.export_dir],
+                self)
+
+        # Run abundance subset script
+        abundance_subset_script = os.path.join(qiime2_helper_dir,
+                "filter_by_abundance.py")
+
+        abundance_subset_cmd = ["python",
+                                abundance_subset_script,
+                                "--asv",
+                                self.input()["table"].path,
+                                "--threshold",
+                                self.threshold,
+                                "--output",
+                                self.output().path]
+
+        run_cmd(abundance_subset_cmd, self)
+
+class Faprotax(luigi.Task):
+    """
+    Runs FAPROTAX (current version 1.2.1)
+    """
+    faprotax_dir = Output_Dirs().faprotax_dir
+
+    def requires(self):
+        return Subset_ASV_By_Abundance()
+
+    def output(self):
+        table = os.path.join(self.faprotax_dir, "functional_table.tsv")
+        report = os.path.join(self.faprotax_dir, "report.txt")
+        log = os.path.join(self.faprotax_dir, "log.txt")
+
+        output = {
+                "table": luigi.LocalTarget(table),
+                "report": luigi.LocalTarget(report),
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop)
+        }
+
+        return output
+
+    def run(self):
+        # Make output dir
+        run_cmd(['mkdir',
+                '-p',
+                self.faprotax_dir],
+                self)
+
+        # Path to faprotax script
+        faprotax_script = os.path.join(FAPROTAX, "collapse_table.py")
+        # Path to faprotax database
+        faprotax_db = os.path.join(FAPROTAX, "FAPROTAX.txt")
+
+        faprotax_cmd = ["python2",
+                        faprotax_script,
+                        '-i',
+                        self.input().path,
+                        '-o',
+                        self.output()['table'].path,
+                        '-g',
+                        faprotax_db,
+                        '-c',
+                        "#",
+                        '-d',
+                        "Consensus.Lineage",
+                        '--omit_columns',
+                        "0,1",
+                        '-r',
+                        self.output()["report"].path,
+                        '-n',
+                        "columns_after_collapsing",
+                        '--omit_samples',
+                        "ReprSequence",
+                        '--force',
+                        '-v']
+
+        faprotax_log = run_cmd(faprotax_cmd, self)
+
+        with self.output()["log"].open('w') as fh:
+            fh.write(faprotax_log)
 
 # Visualizations
 class Denoise_Tabulate(luigi.Task):
@@ -1419,7 +1523,7 @@ class PCoA_Plots(luigi.Task):
                 'jaccard_pcoa', 'bray_curtis_pcoa']
 
         # Make PCoA plots for each distance metric
-        pcoa_plot_script = os.path.join(qiime2_helper_dir, "generate_multiple_pcoa.py")
+        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
         for metric in metrics:
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
