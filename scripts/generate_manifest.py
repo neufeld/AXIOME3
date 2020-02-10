@@ -61,8 +61,7 @@ def read_samplesheet(samplesheet_path):
 
     # Preset header in samplesheet
     # Assume this will always exist in every samplesheet
-    header = "Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID," +\
-            "index,I5_Index_ID,index2,Sample_Project,Description"
+    header = "Sample_ID,Sample_Name"
 
     # Start processing when this is set to true
     should_process = False
