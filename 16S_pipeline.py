@@ -102,6 +102,7 @@ class Output_Dirs(luigi.Config):
     alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(out_dir, "pcoa_plots")
     faprotax_dir = os.path.join(out_dir, "FAPROTAX")
+    picrust_dir = os.path.join(out_dir, "PICRUST2")
 
 class Samples(luigi.Config):
     """
@@ -1248,6 +1249,119 @@ class Faprotax(luigi.Task):
 
         with self.output()["log"].open('w') as fh:
             fh.write(faprotax_log)
+
+class Picrust(luigi.Task):
+    """
+    Run PICRUST2 (installed as QIIME2 plugin)
+    """
+    picrust_dir = Output_Dirs().picrust_dir
+
+    # PICRUST2 options
+    threads = luigi.Parameter(default='6')
+    p_hsp_method = luigi.Parameter(default='mp')
+    max_nsti = luigi.Parameter(default='2')
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        pathway = os.path.join(self.picrust_dir, "pathway_abundance.qza")
+        ec_metagenome = os.path.join(self.picrust_dir, "ec_metagenome.qza")
+        ko_metagenome = os.path.join(self.picrust_dir, "ko_metagenome.qza")
+        #log = os.path.join(self.picrust_dir, "log.txt")
+
+        out = {
+            "pathway": luigi.LocalTarget(pathway),
+            "ec_metagenome": luigi.LocalTarget(ec_metagenome),
+            "ko_metagenome": luigi.LocalTarget(ko_metagenome)
+        #    "log": luigi.LocalTarget(log, format=luigi.format.Nop)
+        }
+
+        return out
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.picrust_dir]
+                , self)
+
+        # Run PICRUST2
+        picrust_cmd = ['qiime',
+                        'picrust2',
+                        'full-pipeline',
+                        '--i-table',
+                        self.input()['table'].path,
+                        '--i-seq',
+                        self.input()['rep_seqs'].path,
+                        '--o-ko-metagenome',
+                        self.output()['ko_metagenome'].path,
+                        '--o-ec-metagenome',
+                        self.output()['ec_metagenome'].path,
+                        '--o-pathway-abundance',
+                        self.output()['pathway'].path,
+                        '--p-threads',
+                        self.threads,
+                        '--p-hsp-method',
+                        self.p_hsp_method,
+                        '--p-max-nsti',
+                        self.max_nsti,
+                        '--verbose']
+
+        log_output = run_cmd(picrust_cmd, self)
+
+        #with self.output['log'].open('w') as fh:
+        #    fh.write(log_output)
+
+class Export_Picrust(luigi.Task):
+    picrust_dir = Output_Dirs().picrust_dir
+    def requires(self):
+        return Picrust()
+
+    def output(self):
+        pathway = os.path.join(self.picrust_dir,
+                "exported_pathway_abundance.tsv")
+        ec_metagenome = os.path.join(self.picrust_dir,
+                "exported_ec_metagenome.tsv")
+        ko_metagenome = os.path.join(self.picrust_dir,
+                "exported_ko_metagenome.tsv")
+
+        out = {
+            "pathway": luigi.LocalTarget(pathway),
+            "ec_metagenome": luigi.LocalTarget(ec_metagenome),
+            "ko_metagenome": luigi.LocalTarget(ko_metagenome)
+        }
+
+        return out
+
+    def run(self):
+        export_script_path = os.path.join(qiime2_helper_dir,
+                "export_qiime_artifact.py")
+
+        pathway_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['pathway'].path,
+                    '--output-path',
+                    self.output()['pathway'].path]
+
+        ec_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['ec_metagenome'].path,
+                    '--output-path',
+                    self.output()['ec_metagenome'].path]
+
+        ko_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['ko_metagenome'].path,
+                    '--output-path',
+                    self.output()['ko_metagenome'].path]
+
+        run_cmd(pathway_command, self)
+        run_cmd(ec_command, self)
+        run_cmd(ko_command, self)
 
 # Visualizations
 class Denoise_Tabulate(luigi.Task):
