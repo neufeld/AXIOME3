@@ -1,0 +1,14 @@
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Running generate_combined_feature_table.py
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Feature table filepath: testing/generate_combined_feature_table/inputs/feature_table.tsv
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Representative sequences filepath: testing/generate_combined_feature_table/inputs/representative_seqs.fasta
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Taxonomy filepath: testing/generate_combined_feature_table/inputs/taxonomy.tsv
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Feature ID colname: Feature ID
+[ 2019-10-02 22:03:47,351 UTC ]: INFO: generate_combined_feature_table: Sort Feature IDs roughly by relative abundance?: False
+[ 2019-10-02 22:03:47,352 UTC ]: INFO: generate_combined_feature_table: Rename Feature IDs sequentially?: False
+[ 2019-10-02 22:03:47,352 UTC ]: INFO: generate_combined_feature_table: Parse Silva taxonomy into 7 ranks?: True
+[ 2019-10-02 22:03:47,352 UTC ]: INFO: generate_combined_feature_table: Loading feature table
+[ 2019-10-02 22:03:47,356 UTC ]: INFO: generate_combined_feature_table: Loading taxonomy file
+[ 2019-10-02 22:03:47,365 UTC ]: INFO: generate_combined_feature_table: Parsing taxonomy into 7 ranks
+[ 2019-10-02 22:03:47,370 UTC ]: INFO: generate_combined_feature_table: Loading representative sequences FastA file
+[ 2019-10-02 22:03:47,378 UTC ]: INFO: generate_combined_feature_table: Writing merged table to testing/generate_combined_feature_table/outputs_expected/04_parsed.tsv
+[ 2019-10-02 22:03:47,381 UTC ]: INFO: generate_combined_feature_table: generate_combined_feature_table.py: done.

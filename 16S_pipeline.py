@@ -26,6 +26,9 @@ script_dir = "scripts"
 # QIIME2 helper directory
 qiime2_helper_dir = os.path.join(script_dir, "qiime2_helper")
 
+# FAPROTAX directory with database file and script
+FAPROTAX = "FAPROTAX"
+
 def run_cmd(cmd, step):
     #try:
     #    output = check_output(cmd)
@@ -98,6 +101,8 @@ class Output_Dirs(luigi.Config):
     visualization_dir = os.path.join(out_dir, "visualization")
     alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(out_dir, "pcoa_plots")
+    faprotax_dir = os.path.join(out_dir, "FAPROTAX")
+    picrust_dir = os.path.join(out_dir, "PICRUST2")
 
 class Samples(luigi.Config):
     """
@@ -159,7 +164,7 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(qiime2_helper_dir,
+            split_script = os.path.join(script_dir,
                     "split_manifest_file_by_run_ID.py")
 
             cmd = ['python',
@@ -591,7 +596,7 @@ class Sample_Count_Summary(luigi.Task):
                 self)
 
         # Run Jackson's count summary script
-        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
+        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
 
         cmd = ['python',
                 count_script,
@@ -795,7 +800,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
+        combined_feature_table_script = os.path.join(script_dir,
                 "generate_combined_feature_table.py")
 
         cmd_pre_rarefied = [combined_feature_table_script,
@@ -1127,7 +1132,7 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
+        combined_feature_table_script = os.path.join(script_dir,
                 "generate_combined_feature_table.py")
 
         cmd_rarefied = [combined_feature_table_script,
@@ -1144,6 +1149,219 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
 
         with self.output()["rarefied_log"].open('w') as fh:
             fh.write(logged_rarefied)
+
+class Subset_ASV_By_Abundance(luigi.Task):
+    """
+    Subsets ASV table by % abundance
+    """
+    export_dir = Output_Dirs().export_dir
+    # Abundance threshold. Default is 1%
+    threshold = luigi.Parameter(default="0.01")
+
+    def requires(self):
+        return Generate_Combined_Feature_Table()
+
+    def output(self):
+        abundance_subset = os.path.join(self.export_dir, "ASV_abundance_filtered.tsv")
+
+        return luigi.LocalTarget(abundance_subset)
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.export_dir],
+                self)
+
+        # Run abundance subset script
+        abundance_subset_script = os.path.join(qiime2_helper_dir,
+                "filter_by_abundance.py")
+
+        abundance_subset_cmd = ["python",
+                                abundance_subset_script,
+                                "--asv",
+                                self.input()["table"].path,
+                                "--threshold",
+                                self.threshold,
+                                "--output",
+                                self.output().path]
+
+        run_cmd(abundance_subset_cmd, self)
+
+class Faprotax(luigi.Task):
+    """
+    Runs FAPROTAX (current version 1.2.1)
+    """
+    faprotax_dir = Output_Dirs().faprotax_dir
+
+    def requires(self):
+        return Subset_ASV_By_Abundance()
+
+    def output(self):
+        table = os.path.join(self.faprotax_dir, "functional_table.tsv")
+        report = os.path.join(self.faprotax_dir, "report.txt")
+        log = os.path.join(self.faprotax_dir, "log.txt")
+
+        output = {
+                "table": luigi.LocalTarget(table),
+                "report": luigi.LocalTarget(report),
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop)
+        }
+
+        return output
+
+    def run(self):
+        # Make output dir
+        run_cmd(['mkdir',
+                '-p',
+                self.faprotax_dir],
+                self)
+
+        # Path to faprotax script
+        faprotax_script = os.path.join(FAPROTAX, "collapse_table.py")
+        # Path to faprotax database
+        faprotax_db = os.path.join(FAPROTAX, "FAPROTAX.txt")
+
+        faprotax_cmd = ["python2",
+                        faprotax_script,
+                        '-i',
+                        self.input().path,
+                        '-o',
+                        self.output()['table'].path,
+                        '-g',
+                        faprotax_db,
+                        '-c',
+                        "#",
+                        '-d',
+                        "Consensus.Lineage",
+                        '--omit_columns',
+                        "0,1",
+                        '-r',
+                        self.output()["report"].path,
+                        '-n',
+                        "columns_after_collapsing",
+                        '--omit_samples',
+                        "ReprSequence",
+                        '--force',
+                        '-v']
+
+        faprotax_log = run_cmd(faprotax_cmd, self)
+
+        with self.output()["log"].open('w') as fh:
+            fh.write(faprotax_log)
+
+class Picrust(luigi.Task):
+    """
+    Run PICRUST2 (installed as QIIME2 plugin)
+    """
+    picrust_dir = Output_Dirs().picrust_dir
+
+    # PICRUST2 options
+    threads = luigi.Parameter(default='6')
+    p_hsp_method = luigi.Parameter(default='mp')
+    max_nsti = luigi.Parameter(default='2')
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        pathway = os.path.join(self.picrust_dir, "pathway_abundance.qza")
+        ec_metagenome = os.path.join(self.picrust_dir, "ec_metagenome.qza")
+        ko_metagenome = os.path.join(self.picrust_dir, "ko_metagenome.qza")
+        #log = os.path.join(self.picrust_dir, "log.txt")
+
+        out = {
+            "pathway": luigi.LocalTarget(pathway),
+            "ec_metagenome": luigi.LocalTarget(ec_metagenome),
+            "ko_metagenome": luigi.LocalTarget(ko_metagenome)
+        #    "log": luigi.LocalTarget(log, format=luigi.format.Nop)
+        }
+
+        return out
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.picrust_dir]
+                , self)
+
+        # Run PICRUST2
+        picrust_cmd = ['qiime',
+                        'picrust2',
+                        'full-pipeline',
+                        '--i-table',
+                        self.input()['table'].path,
+                        '--i-seq',
+                        self.input()['rep_seqs'].path,
+                        '--o-ko-metagenome',
+                        self.output()['ko_metagenome'].path,
+                        '--o-ec-metagenome',
+                        self.output()['ec_metagenome'].path,
+                        '--o-pathway-abundance',
+                        self.output()['pathway'].path,
+                        '--p-threads',
+                        self.threads,
+                        '--p-hsp-method',
+                        self.p_hsp_method,
+                        '--p-max-nsti',
+                        self.max_nsti,
+                        '--verbose']
+
+        log_output = run_cmd(picrust_cmd, self)
+
+        #with self.output['log'].open('w') as fh:
+        #    fh.write(log_output)
+
+class Export_Picrust(luigi.Task):
+    picrust_dir = Output_Dirs().picrust_dir
+    def requires(self):
+        return Picrust()
+
+    def output(self):
+        pathway = os.path.join(self.picrust_dir,
+                "exported_pathway_abundance.tsv")
+        ec_metagenome = os.path.join(self.picrust_dir,
+                "exported_ec_metagenome.tsv")
+        ko_metagenome = os.path.join(self.picrust_dir,
+                "exported_ko_metagenome.tsv")
+
+        out = {
+            "pathway": luigi.LocalTarget(pathway),
+            "ec_metagenome": luigi.LocalTarget(ec_metagenome),
+            "ko_metagenome": luigi.LocalTarget(ko_metagenome)
+        }
+
+        return out
+
+    def run(self):
+        export_script_path = os.path.join(qiime2_helper_dir,
+                "export_qiime_artifact.py")
+
+        pathway_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['pathway'].path,
+                    '--output-path',
+                    self.output()['pathway'].path]
+
+        ec_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['ec_metagenome'].path,
+                    '--output-path',
+                    self.output()['ec_metagenome'].path]
+
+        ko_command = ['python',
+                    export_script_path,
+                    '--artifact-path',
+                    self.input()['ko_metagenome'].path,
+                    '--output-path',
+                    self.output()['ko_metagenome'].path]
+
+        run_cmd(pathway_command, self)
+        run_cmd(ec_command, self)
+        run_cmd(ko_command, self)
 
 # Visualizations
 class Denoise_Tabulate(luigi.Task):
@@ -1419,7 +1637,7 @@ class PCoA_Plots(luigi.Task):
                 'jaccard_pcoa', 'bray_curtis_pcoa']
 
         # Make PCoA plots for each distance metric
-        pcoa_plot_script = os.path.join(qiime2_helper_dir, "generate_multiple_pcoa.py")
+        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
         for metric in metrics:
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
