@@ -14,17 +14,17 @@ python generate_pcoa.py \
   --metadata <PATH TO YOUR METADATA. REQUIRED> \
   --target-primary <COLUMN IN METADATA YOU WANT TO VISUALIZE. REQUIRED> \
   --target-secondary <ADDITIONA COLUMN TO BE VISUALIZED. OPTINAL> \
-  --point-size <SCATTER PLOT DATA POINT SIZE. DEFAULT=6>
+  --point-size <SCATTER PLOT DATA POINT SIZE. DEFAULT=6> \
   --output <PATH_TO_STORE_OUTPUT_AS. DEFAULT="./PCoA_plot.pdf"
  
 ---------------------------------------------------------------
 -Actual Example-
 python generate_pcoa.py \
-  --input-qza /Winnebago/danielm710/katja_analysis/sample9/bray-curtis-pcoa_6000.qza \
-  --metadata /Winnebago/danielm710/katja_analysis/sample9/MetadataHarwellPro.tsv \
-  --target-primary SampleID2 \
-  --target-secondary Cycle \
-  --point-size 4
+  --pcoa-qza /Winnebago/danielm710/sample_data_AXIOME3/bray_curtis_pcoa.qza \
+  --metadata /Winnebago/danielm710/sample_data_AXIOME3/metadata_MaCoTe.tsv \
+  --target-primary Types \
+  --target-secondary NTCGroup \
+  --point-size 4 \
   --output myPlot.pdf
 ```
 

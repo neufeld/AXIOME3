@@ -98,13 +98,27 @@ def convert_qiime2_2_skbio(pcoa_artifact):
 
     return pcoa
 
-def load_metadata(metadata_path):
+def load_metadata(metadata_path, target_primary, target_secondary):
     # Load metadata into pandas dataframe
     metadata_df = pd.read_csv(metadata_path, sep='\t', comment='#', index_col=0)
     # Rename index
     metadata_df.index.names = ['SampleID']
-    # Replace space characters with underscore
-    metadata_df.columns = metadata_df.columns.str.replace(' ', '_')
+
+    # Make sure user specified target columns actually exist in the dataframe
+    if(target_primary not in metadata_df.columns):
+        msg = "Column '{column}' does NOT exist in the metadata!".format(
+                column=target_primary
+                )
+
+        raise ValueError(msg)
+
+    if(target_secondary is not None and
+        target_secondary not in metadata_df.columns):
+        msg = "Column '{column}' does NOT exist in the metadata!".format(
+                column=target_secondary
+                )
+
+        raise ValueError(msg)
 
     return metadata_df
 
@@ -134,6 +148,16 @@ def add_discrete_shape(plot, n_shapes, name):
 
     return plot
 
+def convert_to_category(df, col):
+    """
+    Convert given column type to category
+    """
+    # Non-existent column exception should be caught by pandas library
+
+    df[col] = df[col].astype('category')
+
+    return df
+
 def generate_pcoa_plot(pcoa,
         metadata_df,
         colouring_variable,
@@ -154,32 +178,21 @@ def generate_pcoa_plot(pcoa,
     x_explained = str(round(proportions[0] * 100, 1))
     y_explained = str(round(proportions[1] * 100, 1))
 
-    # Make sure user specified target columns actually exist in the dataframe
-    colouring_variable = colouring_variable.replace(' ', '_')
-    shape_variable = shape_variable.replace(' ', '_') \
-            if shape_variable != None \
-            else None
-
-    if(colouring_variable not in pcoa_data_samples.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=colouring_variable
-                )
-
-        raise ValueError(msg)
-
-    if(shape_variable is not None and
-            shape_variable not in pcoa_data_samples.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=shape_variable
-                )
-
-        raise ValueError(msg)
-
-    # Pre-format target variables
-    primary_target_fill = 'factor(' + str(colouring_variable) + ')'
+    # Convert user specified columns to category
+    # **BIG ASSUMPTION HERE**
+    pcoa_data_samples = convert_to_category(pcoa_data_samples,
+            colouring_variable)
 
     if(shape_variable is not None):
-        secondary_target_fill = 'factor(' + str(shape_variable) + ')'
+        pcoa_data_samples = convert_to_category(pcoa_data_samples,
+                shape_variable)
+
+    # Pre-format target variables
+    #primary_target_fill = 'factor(' + str(colouring_variable) + ')'
+    primary_target_fill = str(colouring_variable)
+
+    if(shape_variable is not None):
+        secondary_target_fill = str(shape_variable)
 
         ggplot_obj = ggplot(pcoa_data_samples,
                         aes(x='PC1',
@@ -257,7 +270,8 @@ if __name__ == "__main__":
     pcoa = convert_qiime2_2_skbio(args.pcoa_qza)
 
     # Load metadata
-    metadata_df = load_metadata(args.metadata)
+    metadata_df = load_metadata(args.metadata, args.target_primary,
+            args.target_secondary)
 
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
