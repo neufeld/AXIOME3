@@ -1009,7 +1009,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
         run_cmd(cmd, self)
 
 class Rarefy(luigi.Task):
-    sampling_depth = luigi.Parameter(default="10000")
+    sampling_depth = Samples().sampling_depth
 
     rarefy_dir = Output_Dirs().rarefy_dir
 
@@ -1486,7 +1486,7 @@ class Taxonomy_Tabulate(luigi.Task):
         run_cmd(cmd, step)
 
 class Rarefaction_Curves(luigi.Task):
-    max_depth = luigi.Parameter(default="10000")
+    max_depth = Samples().sampling_depth
     out_dir = Output_Dirs().visualization_dir
 
     def requires(self):
