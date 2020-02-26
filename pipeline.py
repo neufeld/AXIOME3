@@ -7,6 +7,11 @@ import logging
 import pandas as pd
 from textwrap import dedent
 
+# Import custom modules
+from scripts.qiime2_helper.summarize_sample_counts import get_sample_count
+from scripts.qiime2_helper.generate_combined_feature_table import combine_table
+from scripts.qiime2_helper.generate_multiple_pcoa import generate_pdf
+
 # Define custom logger
 logger = logging.getLogger("custom logger")
 
@@ -585,6 +590,7 @@ class Sample_Count_Summary(luigi.Task):
 
     def output(self):
         summary_file = os.path.join(self.out_dir, "sample_counts.tsv")
+        log_file = os.path.join(self.out_dir, "log.txt")
 
         return luigi.LocalTarget(summary_file)
 
@@ -595,17 +601,7 @@ class Sample_Count_Summary(luigi.Task):
                 self.out_dir],
                 self)
 
-        # Run Jackson's count summary script
-        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
-
-        cmd = ['python',
-                count_script,
-                '--input_filepath',
-                self.input()['table'].path,
-                '--output_filepath',
-                self.output().path]
-
-        run_cmd(cmd, self)
+        get_sample_count(self.input()['table'].path, self.output().path)
 
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
@@ -787,7 +783,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
         output = {
                 "table": luigi.LocalTarget(combined_table),
-                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                #"log": luigi.LocalTarget(log, format=luigi.format.Nop),
                 }
 
         return output
@@ -799,25 +795,14 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self.export_dir],
                 self)
 
-        # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
-                "generate_combined_feature_table.py")
-
-        cmd_pre_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Convert_Biom_to_TSV"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["table"].path]
-
-        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, self)
+        combine_table(self.input()["Convert_Biom_to_TSV"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["table"].path)
 
         # Write log files
-        with self.output()["log"].open('w') as fh:
-            fh.write(logged_pre_rarefied)
+        #with self.output()["log"].open('w') as fh:
+        #    fh.write(logged_pre_rarefied)
 
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
@@ -1118,8 +1103,8 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
 
         output = {
                 "rarefied_table": luigi.LocalTarget(combined_rarefied_table),
-                "rarefied_log": luigi.LocalTarget(rarefied_log,
-                    format=luigi.format.Nop)
+                #"rarefied_log": luigi.LocalTarget(rarefied_log,
+                #    format=luigi.format.Nop)
                 }
 
         return output
@@ -1131,24 +1116,10 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self.rarefy_export_dir],
                 self)
 
-        # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
-                "generate_combined_feature_table.py")
-
-        cmd_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Convert_Rarefy_Biom_to_TSV"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["rarefied_table"].path]
-
-        logged_rarefied = run_cmd(cmd_rarefied, self)
-
-        with self.output()["rarefied_log"].open('w') as fh:
-            fh.write(logged_rarefied)
+        combine_table(self.input()["Convert_Rarefy_Biom_to_TSV"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["rarefied_table"].path)
 
 class Subset_ASV_By_Abundance(luigi.Task):
     """
@@ -1642,18 +1613,10 @@ class PCoA_Plots(luigi.Task):
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
 
-            cmd = ['python',
-                    pcoa_plot_script,
-                    '--pcoa-qza',
-                    self.input()[metric].path,
-                    '--metadata',
-                    self.metadata_file,
-                    '--file-name',
-                    filename,
-                    '--output-dir',
-                    outdir]
-
-            run_cmd(cmd, self)
+            generate_pdf(self.input()[metric].path,
+                        self.metadata_file,
+                        filename,
+                        outdir)
 
 # Get software version info
 class Get_Version_Info(luigi.Task):
