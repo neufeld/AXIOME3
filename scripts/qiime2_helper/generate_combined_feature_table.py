@@ -192,6 +192,26 @@ def add_row_id(feature_table):
 
     return feature_table
 
+def combine_table(feature_table_filepath, rep_seq_filepath, taxonomy_filepath,
+        output_filepath):
+    """
+    Generates combined feature table.
+
+    Input:
+        - feature_table_filepath: feature table file (.tsv)
+        - rep_seq_filepath: representative sequence file (.fasta)
+        - taxonomy_filepath: taxonomy classification file (.tsv)
+        - output_filepath: Path to save output
+    """
+    feature_table = read_feature_table(feature_table_filepath)
+    # Add taxonomy information
+    feature_table = add_taxonomy_to_feature_table(feature_table, taxonomy_filepath)
+    # Add row IDs as column in the beginning
+    feature_table = add_row_id(feature_table)
+    # Add representative sequences
+    feature_table = add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
+    # Save output
+    feature_table.to_csv(output_filepath, sep = '\t', index = False)
 
 def main(args):
     # Set user variables
