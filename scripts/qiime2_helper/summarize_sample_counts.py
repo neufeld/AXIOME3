@@ -110,6 +110,27 @@ def write_min_count(min_count_filepath, sample_count_df):
             logger.error(err)
             raise
 
+def get_sample_count(feature_table_filepath, output_filepath):
+    """
+    Get sample count and save it to a file
+
+    Input:
+        - feature_table_filepath: path to feature table QIIME2 artifact.
+        - output_filepath: path to save output
+    """
+    logger.info("Running summarize_sample_counts.py")
+
+    # Load feature table as pandas dataframe
+    feature_table_df = load_qiime2_artifact(feature_table_filepath)
+
+    # Generate sample counts
+    sample_count_df = generate_sample_count(feature_table_df)
+
+    # Write output
+    write_output(sample_count_df, output_filepath)
+
+    logger.info("Done!")
+
 def main(args):
     # Set user variables
     input_filepath = args.input_filepath
