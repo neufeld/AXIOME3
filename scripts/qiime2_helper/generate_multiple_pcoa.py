@@ -1,6 +1,12 @@
 # Custom module
 # Slightly modified version of generate_pcoa.py
-from generate_pcoa import *
+from generate_pcoa import (
+    convert_qiime2_2_skbio,
+    load_metadata,
+    generate_pcoa_plot
+)
+
+from plotnine.ggplot import save_as_pdf_pages
 
 # Colour formatters
 formatters = {
@@ -60,6 +66,29 @@ def run_multiple(pcoa, metadata_df, point_size):
                 colouring_variable=str(column),
                 shape_variable=None,
                 point_size=point_size)
+
+def generate_pdf(pcoa_qza, metadata, file_name, output_dir, point_size=6):
+    """
+    Generates a single pdf file with multiple PCoA plots
+
+    Input:
+        - pcoa_qza: PCoA QIIME2 Artifact
+        - metadata: path to metadata file
+        - file_name: name of the output file
+        - output_dir: directory to save output file in
+        - point_size: ggplot point size. Default=6
+    """
+    pcoa = convert_qiime2_2_skbio(pcoa_qza)
+
+    # Load metadata into pandas dataframe
+    metadata_df = load_metadata(metadata)
+
+    #generate_pcoa_plot(pcoa, metadata_df, args.target_primary)
+    output_name = "PCoA_plots_all.pdf"
+    save_as_pdf_pages(
+            run_multiple(pcoa, metadata_df, point_size),
+            filename=file_name,
+            path=output_dir)
 
 if __name__ == "__main__":
     parser = args_parse()
