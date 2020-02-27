@@ -1,6 +1,6 @@
 # Custom module
 # Slightly modified version of generate_pcoa.py
-from generate_pcoa import (
+from scripts.qiime2_helper.generate_pcoa import (
     convert_qiime2_2_skbio,
     load_metadata,
     generate_pcoa_plot
