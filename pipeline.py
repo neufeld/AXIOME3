@@ -16,7 +16,7 @@ from scripts.qiime2_helper.generate_multiple_pcoa import generate_pdf
 logger = logging.getLogger("custom logger")
 
 # Path to configuration file to be used
-luigi.configuration.add_config_path("configuration/luigi.cfg")
+#luigi.configuration.add_config_path("configuration/luigi.cfg")
 
 # Color formatter
 formatters = {
@@ -122,6 +122,10 @@ class Samples(luigi.Config):
     sampling_depth = luigi.Parameter(default='10000')
 
     def get_samples(self):
+        # If manifest file not specified by user, return
+        if(self.manifest_file == "<MANIFEST_PATH>"):
+            return
+
         manifest_df = pd.read_csv(self.manifest_file, index_col=0)
 
         # Return set of sample IDs if multiple IDs found
