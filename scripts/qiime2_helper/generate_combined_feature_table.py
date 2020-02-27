@@ -11,7 +11,10 @@ import logging
 import argparse
 import re
 
-from Bio.SeqIO.FastaIO import SimpleFastaParser
+# biopython not installing for some reason in docker
+#from Bio.SeqIO.FastaIO import SimpleFastaParser
+# Using custom script instead for parsing fasta file
+from scripts.qiime2_helper.fasta_parser import get_id_and_seq
 import pandas as pd
 
 # GLOBAL VARIABLES
@@ -89,13 +92,12 @@ def add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath):
     # Load the FastA file as a pandas dataframe
     # Based on https://stackoverflow.com/a/19452991 (accessed Sept. 12, 2019)
     logger.info('Loading representative sequences FastA file')
-    with open(rep_seq_filepath, 'r') as fasta_data:
-        fasta_ids = []
-        fasta_seqs = []
+    fasta_ids = []
+    fasta_seqs = []
 
-        for id, seq in SimpleFastaParser(fasta_data):
-            fasta_ids.append(id)
-            fasta_seqs.append(seq)
+    for _id, seq in get_id_and_seq(rep_seq_filepath):
+        fasta_ids.append(_id)
+        fasta_seqs.append(seq)
 
     rep_seq_dict = {'Feature ID': fasta_ids, 'ReprSequence': fasta_seqs}
     rep_seq_table = pd.DataFrame(rep_seq_dict)
