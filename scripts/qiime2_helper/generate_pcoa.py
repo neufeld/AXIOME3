@@ -98,14 +98,15 @@ def convert_qiime2_2_skbio(pcoa_artifact):
 
     return pcoa
 
-def load_metadata(metadata_path, target_primary, target_secondary):
+def load_metadata(metadata_path, target_primary=None, target_secondary=None):
     # Load metadata into pandas dataframe
     metadata_df = pd.read_csv(metadata_path, sep='\t', comment='#', index_col=0)
     # Rename index
     metadata_df.index.names = ['SampleID']
 
     # Make sure user specified target columns actually exist in the dataframe
-    if(target_primary not in metadata_df.columns):
+    if(target_primary is not None and
+        target_primary not in metadata_df.columns):
         msg = "Column '{column}' does NOT exist in the metadata!".format(
                 column=target_primary
                 )
