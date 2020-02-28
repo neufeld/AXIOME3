@@ -1636,7 +1636,7 @@ class PCoA_Plots(luigi.Task):
                 'jaccard_pcoa', 'bray_curtis_pcoa']
 
         # Make PCoA plots for each distance metric
-        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
+        pcoa_plot_script = os.path.join(qiime2_helper_dir, "generate_multiple_pcoa.py")
         for metric in metrics:
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
