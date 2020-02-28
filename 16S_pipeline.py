@@ -595,8 +595,7 @@ class Sample_Count_Summary(luigi.Task):
                 self.out_dir],
                 self)
 
-        # Run Jackson's count summary script
-        count_script = os.path.join(script_dir, "summarize_sample_counts.py")
+        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
 
         cmd = ['python',
                 count_script,
@@ -800,7 +799,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
+        combined_feature_table_script = os.path.join(qiime2_helper_dir,
                 "generate_combined_feature_table.py")
 
         cmd_pre_rarefied = [combined_feature_table_script,
@@ -1132,7 +1131,7 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self)
 
         # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(script_dir,
+        combined_feature_table_script = os.path.join(qiime2_helper_dir,
                 "generate_combined_feature_table.py")
 
         cmd_rarefied = [combined_feature_table_script,
