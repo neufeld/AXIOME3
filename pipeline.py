@@ -13,10 +13,14 @@ from scripts.qiime2_helper.generate_combined_feature_table import combine_table
 from scripts.qiime2_helper.generate_multiple_pcoa import generate_pdf
 
 # Define custom logger
-logger = logging.getLogger("custom logger")
+logger = logging.getLogger("luigi logger")
 
 # Path to configuration file to be used
-#luigi.configuration.add_config_path("configuration/luigi.cfg")
+if("LUIGI_CONFIG_PATH" not in os.environ):
+    raise FileNotFoundError("Add LUIGI_CONFIG_PATH to environment variable!")
+
+config_path = os.environ["LUIGI_CONFIG_PATH"]
+luigi.configuration.add_config_path(config_path)
 
 # Color formatter
 formatters = {
