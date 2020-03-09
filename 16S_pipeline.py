@@ -7,8 +7,11 @@ import logging
 import pandas as pd
 from textwrap import dedent
 
+# Custom Scripts
+from scripts.qiime2_helper import export_qiime_artifact
+
 # Define custom logger
-logger = logging.getLogger("custom logger")
+logger = logging.getLogger("16S-pipeline")
 
 # Path to configuration file to be used
 luigi.configuration.add_config_path("configuration/luigi.cfg")
@@ -933,6 +936,59 @@ class Taxa_Collapse(luigi.Task):
             level = level + 1
 
             run_cmd(cmd, self)
+
+class Export_Taxa_Collapse(luigi.Task):
+    collapse_dir = Output_Dirs().collapse_dir
+
+    def requires(self):
+        return Taxa_Collapse()
+
+    def output(self):
+        exported_domain_collapsed_table = os.path.join(self.collapse_dir,
+                "domain_collapsed_table.tsv")
+        exported_phylum_collapsed_table = os.path.join(self.collapse_dir,
+                "phylum_collapsed_table.tsv")
+        exported_class_collapsed_table = os.path.join(self.collapse_dir,
+                "class_collapsed_table.tsv")
+        exported_order_collapsed_table = os.path.join(self.collapse_dir,
+                "order_collapsed_table.tsv")
+        exported_family_collapsed_table = os.path.join(self.collapse_dir,
+                "family_collapsed_table.tsv")
+        exported_genus_collapsed_table = os.path.join(self.collapse_dir,
+                "genus_collapsed_table.tsv")
+        exported_species_collapsed_table = os.path.join(self.collapse_dir,
+                "species_collapsed_table.tsv")
+
+        output = {
+            "domain": luigi.LocalTarget(exported_domain_collapsed_table),
+            "phylum": luigi.LocalTarget(exported_phylum_collapsed_table),
+            "class": luigi.LocalTarget(exported_class_collapsed_table),
+            "order": luigi.LocalTarget(exported_order_collapsed_table),
+            "family": luigi.LocalTarget(exported_family_collapsed_table),
+            "genus": luigi.LocalTarget(exported_genus_collapsed_table),
+            "species": luigi.LocalTarget(exported_species_collapsed_table)
+        }
+
+        return output
+
+    def run(self):
+        # Make output dir
+        run_cmd(["mkdir",
+                "-p",
+                self.collapse_dir],
+                self)
+
+        # Taxa collapse
+        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
+                "species"]
+
+        for taxa in taxa_keys:
+            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            collapsed_df = output["feature_table"]
+
+            collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
+                    index_label="SampleID")
+
 
 # Post Analysis
 # Most of these require rarefaction depth as a user parameter
