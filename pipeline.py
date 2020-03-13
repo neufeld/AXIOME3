@@ -15,11 +15,15 @@ from scripts.qiime2_helper.generate_multiple_pcoa import generate_pdf
 # Define custom logger
 logger = logging.getLogger("luigi logger")
 
-# Path to configuration file to be used
-if("LUIGI_CONFIG_PATH" not in os.environ):
-    raise FileNotFoundError("Add LUIGI_CONFIG_PATH to environment variable!")
+## Path to configuration file to be used
+#if("LUIGI_CONFIG_PATH" not in os.environ):
+#    raise FileNotFoundError("Add LUIGI_CONFIG_PATH to environment variable!")
+#
+#config_path = os.environ["LUIGI_CONFIG_PATH"]
+#luigi.configuration.add_config_path(config_path)
 
-config_path = os.environ["LUIGI_CONFIG_PATH"]
+# Path to configuration file to be used
+config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
 luigi.configuration.add_config_path(config_path)
 
 # Color formatter
