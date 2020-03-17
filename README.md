@@ -433,11 +433,13 @@ _if you don't see the above message (notice the smiley face, ":)"), or your outp
 ## Post Analysis
 This section is the extension of "Core Analysis" section. **It requires all the outputs from the "Core Analysis" section, so DO NOT remove any files or folders if you wish to run this section.**  
 
-None of the "Post Analysis" steps are time-consuming, so you may re-run this section multiple times by varying user supplied parameters (e.g. metadata, sampling-depth).
-
 **You can also re-run post analysis if wanting to try different sampling depths or metadata file. In this case,** 
 1. Remove/rename/move output/post_analysis directory.
 2. Prepare a metadata file with subset of the samples listed. (if wanting to re-run the analysis with the subset of the samples)
+
+**A lot of the steps in post analysis are dependent on sampling depth parameter. Any samples that are below the sampling depth parameter will be thrown away.**
+
+*You may examine output/post_analysis/filtered/filtered_table_summary.txt file to determine appropriate sampling depth for your samples. Usually, picking the lowest value possible that does not vary as much between samples works well*
 
 ### - Core Metrics Phylogeny -
 It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
