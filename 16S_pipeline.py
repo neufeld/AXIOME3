@@ -991,6 +991,39 @@ class Export_Taxa_Collapse(luigi.Task):
 
 
 # Post Analysis
+# Filter sample by metadata
+class Filter_Feature_Table(luigi.Task):
+    metadata_file = Samples().metadata_file
+    denoise_dir = Output_Dirs().denoise_dir
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        filtered_table = os.path.join(self.denoise_dir, "filtered_table.qza")
+
+        return luigi.LocalTarget(filtered_table)
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.denoise_dir],
+                self)
+
+        # filter-sample command
+        cmd = ["qiime",
+                "feature-table",
+                "filter-samples",
+                "--i-table",
+                self.input()["table"].path,
+                "--m-metadata-file",
+                self.metadata_file,
+                "--o-filtered-table",
+                self.output().path]
+
+        run_cmd(cmd, self)
+
 # Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
@@ -998,7 +1031,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
 
     def requires(self):
         return {
-                'Merge_Denoise': Merge_Denoise(),
+                'Filter_Feature_Table': Filter_Feature_Table(),
                 'Phylogeny_Tree': Phylogeny_Tree()
                 }
 
@@ -1061,7 +1094,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
     def run(self):
         # Make sure Metadata file is provided and exists
         if not(os.path.isfile(self.metadata_file)):
-            msg = dedent("""
+            msg = dedent("""\
                     Metadata file is not provided or the provided Metadata file
                     does not exist!
                     """)
@@ -1080,7 +1113,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 'diversity',
                 'core-metrics-phylogenetic',
                 '--i-table',
-                self.input()['Merge_Denoise']['table'].path,
+                self.input()['Filter_Feature_Table'].path,
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-sampling-depth',
