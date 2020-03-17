@@ -95,18 +95,22 @@ class Output_Dirs(luigi.Config):
     out_dir = Out_Prefix().prefix
     manifest_dir = os.path.join(out_dir, "manifest")
     denoise_dir = os.path.join(out_dir, "dada2")
-    rarefy_dir = os.path.join(out_dir, "rarefy")
     taxonomy_dir = os.path.join(out_dir, "taxonomy")
     export_dir = os.path.join(out_dir, "exported")
-    rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
     phylogeny_dir = os.path.join(out_dir, "phylogeny")
     collapse_dir = os.path.join(out_dir, "taxa_collapse")
-    core_metric_dir = os.path.join(out_dir, "core_div_phylogeny")
+    rarefy_dir = os.path.join(out_dir, "rarefy")
+
+    post_analysis_dir = os.path.join(out_dir, "post_analysis")
+    filtered_dir = os.path.join(post_analysis_dir, "filtered")
+    rarefy_export_dir = os.path.join(post_analysis_dir, "rarefy_exported")
+    core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
+    alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
+    pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
+    faprotax_dir = os.path.join(post_analysis_dir, "FAPROTAX")
+    picrust_dir = os.path.join(post_analysis_dir, "PICRUST2")
+
     visualization_dir = os.path.join(out_dir, "visualization")
-    alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
-    pcoa_dir = os.path.join(out_dir, "pcoa_plots")
-    faprotax_dir = os.path.join(out_dir, "FAPROTAX")
-    picrust_dir = os.path.join(out_dir, "PICRUST2")
 
 class Samples(luigi.Config):
     """
@@ -994,13 +998,13 @@ class Export_Taxa_Collapse(luigi.Task):
 # Filter sample by metadata
 class Filter_Feature_Table(luigi.Task):
     metadata_file = Samples().metadata_file
-    denoise_dir = Output_Dirs().denoise_dir
+    filtered_dir = Output_Dirs().filtered_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        filtered_table = os.path.join(self.denoise_dir, "filtered_table.qza")
+        filtered_table = os.path.join(self.filtered_dir, "filtered_table.qza")
 
         return luigi.LocalTarget(filtered_table)
 
@@ -1008,7 +1012,7 @@ class Filter_Feature_Table(luigi.Task):
         # Make output direcotry
         run_cmd(["mkdir",
                 "-p",
-                self.denoise_dir],
+                self.filtered_dir],
                 self)
 
         # filter-sample command
@@ -1020,6 +1024,36 @@ class Filter_Feature_Table(luigi.Task):
                 "--m-metadata-file",
                 self.metadata_file,
                 "--o-filtered-table",
+                self.output().path]
+
+        run_cmd(cmd, self)
+
+class Summarize_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        summary_file = os.path.join(self.filtered_dir,
+                "filtered_table_summary.txt")
+
+        return luigi.LocalTarget(summary_file)
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
+
+        cmd = ['python',
+                count_script,
+                '--input_filepath',
+                self.input().path,
+                '--output_filepath',
                 self.output().path]
 
         run_cmd(cmd, self)
@@ -1865,6 +1899,7 @@ class Core_Analysis(luigi.Task):
 class Post_Analysis(luigi.Task):
     def requires(self):
         return [
+                Summarize_Filtered_Table(),
                 Core_Metrics_Phylogeny(),
                 Alpha_Group_Significance(),
                 Generate_Combined_Rarefied_Feature_Table(),
