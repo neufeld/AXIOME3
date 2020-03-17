@@ -298,7 +298,6 @@ output/dada2/
 ├── merged
 │   ├── merged_rep_seqs.qza
 │   └── merged_table.qza
-├── sample_counts.tsv
 ├── stats_dada2.qza
 ```
 
@@ -372,7 +371,7 @@ This progress looks :) because there were no failed tasks or missing dependencie
 7. Your "output" directory (directory named "output") should look something like this
 
 ```
-output
+output/
 ├── core_analysis_done
 ├── dada2
 │   ├── dada2_log.txt
@@ -382,9 +381,11 @@ output
 │   │   ├── merged_dada2_rep_seqs.qzv
 │   │   ├── merged_rep_seqs.qza
 │   │   └── merged_table.qza
+│   ├── sample_counts.tsv
 │   ├── stats_dada2.qza
 │   └── stats_dada2.qzv
 ├── exported
+│   ├── ASV_abundance_filtered.tsv
 │   ├── ASV_table_combined.log
 │   ├── ASV_table_combined.tsv
 │   ├── dna-sequences.fasta
@@ -393,18 +394,38 @@ output
 │   └── taxonomy.tsv
 ├── manifest
 │   └── manifest.csv
-├── paired_end_demux.qza
 ├── paired_end_demux.qzv
+├── pcoa_plots
+│   ├── bray_curtis_pcoa_plots.pdf
+│   ├── jaccard_pcoa_plots.pdf
+│   ├── unweighted_unifrac_pcoa_plots.pdf
+│   └── weighted_unifrac_pcoa_plots.pdf
 ├── phylogeny
 │   ├── aligned_rep_seqs.qza
 │   ├── masked_aligned_rep_seqs.qza
 │   ├── rooted_tree.qza
 │   └── unrooted_tree.qza
-└── taxonomy
-    ├── taxonomy_log.txt
-    ├── taxonomy.qza
-    └── taxonomy.qzv
-├── version_info.txt
+├── taxa_collapse
+│   ├── class_collapsed_table.qza
+│   ├── class_collapsed_table.tsv
+│   ├── domain_collapsed_table.qza
+│   ├── domain_collapsed_table.tsv
+│   ├── family_collapsed_table.qza
+│   ├── family_collapsed_table.tsv
+│   ├── genus_collapsed_table.qza
+│   ├── genus_collapsed_table.tsv
+│   ├── order_collapsed_table.qza
+│   ├── order_collapsed_table.tsv
+│   ├── phylum_collapsed_table.qza
+│   ├── phylum_collapsed_table.tsv
+│   ├── species_collapsed_table.qza
+│   └── species_collapsed_table.tsv
+├── taxonomy
+│   ├── taxonomy_log.txt
+│   ├── taxonomy.qza
+│   └── taxonomy.qzv
+└── version_info.txt
+
 ```
 
 _if you don't see the above message (notice the smiley face, ":)"), or your output directory is missing some files, it means the pipeline is not successfully run. Check with the lab's bioinformatician if the error is not obvious_
@@ -414,10 +435,14 @@ This section is the extension of "Core Analysis" section. **It requires all the 
 
 None of the "Post Analysis" steps are time-consuming, so you may re-run this section multiple times by varying user supplied parameters (e.g. metadata, sampling-depth).
 
+**You can also re-run post analysis if wanting to try different sampling depths or metadata file. In this case,** 
+1. Remove/rename/move output/post_analysis directory.
+2. Prepare a metadata file with subset of the samples listed. (if wanting to re-run the analysis with the subset of the samples)
+
 ### - Core Metrics Phylogeny -
 It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis, Weighted/Unweighted Unifrac), and all the intermediate outputs.
 
-**Note that you may repeat any of the "Post Analysis" steps based on different sampling-depth thresholds. Just make sure to remove/move/rename corresponding directories prior to do so.**
+**Note: It will filter the samples first by sampling depth threshold, then by the samples listed in your metadata file. (For example, it will first remove samples that do NOT meet sampling depth threshold, then furthur remove samples that are not present in the metadata file)**
 
 1. Generate configuration file.
 
