@@ -98,15 +98,20 @@ def convert_qiime2_2_skbio(pcoa_artifact):
 
     return pcoa
 
-def load_metadata(metadata_path, target_primary=None, target_secondary=None):
+def load_metadata(metadata_path):
     # Load metadata into pandas dataframe
     metadata_df = pd.read_csv(metadata_path, sep='\t', comment='#', index_col=0)
     # Rename index
     metadata_df.index.names = ['SampleID']
 
+    return metadata_df
+
+def check_metadata(metadata_df, target_primary, target_secondary=None):
+    """
+    Check if metadata has specified target columns
+    """
     # Make sure user specified target columns actually exist in the dataframe
-    if(target_primary is not None and
-        target_primary not in metadata_df.columns):
+    if(target_primary not in metadata_df.columns):
         msg = "Column '{column}' does NOT exist in the metadata!".format(
                 column=target_primary
                 )
@@ -121,16 +126,14 @@ def load_metadata(metadata_path, target_primary=None, target_secondary=None):
 
         raise ValueError(msg)
 
-    return metadata_df
-
 # Add a custom colour scale onto a plotnine ggplot
 def add_discrete_fill_colours(plot, n_colours, name):
     n_colours = int(n_colours)
 
-    if n_colours <= 8:
+    if n_colours <= 9:
         plot = plot + scale_fill_brewer(type='qual',palette='Set1',name=name)
-    elif (n_colours >= 9) & (n_colours <= 12):
-        plot = plot + scale_fill_brewer(type='qual',palette='Set3',name=name)
+    elif (n_colours >= 10) & (n_colours <= 12):
+        plot = plot + scale_fill_brewer(type='qual',palette='Paired',name=name)
     elif n_colours > 12:
         plot = plot
 
@@ -271,8 +274,10 @@ if __name__ == "__main__":
     pcoa = convert_qiime2_2_skbio(args.pcoa_qza)
 
     # Load metadata
-    metadata_df = load_metadata(args.metadata, args.target_primary,
-            args.target_secondary)
+    metadata_df = load_metadata(args.metadata)
+
+    # Check if metadata has target columns
+    check_metadata(metadata_df, args.target_primary, args.target_secondary)
 
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
