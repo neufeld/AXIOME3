@@ -122,7 +122,7 @@ class Samples(luigi.Config):
     manifest_file = luigi.Parameter()
     metadata_file = luigi.Parameter(default='')
     is_multiple = luigi.Parameter(default='n')
-    sampling_depth = luigi.Parameter(default='10000')
+    sampling_depth = luigi.Parameter(default='1000')
 
     def get_samples(self):
         manifest_df = pd.read_csv(self.manifest_file, index_col=0)
