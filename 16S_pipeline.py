@@ -1886,6 +1886,7 @@ class Core_Analysis(luigi.Task):
                 Sample_Count_Summary(),
                 Sequence_Tabulate(),
                 Taxonomy_Tabulate(),
+                Export_Taxa_Collapse(),
                 Get_Version_Info()
                 ]
 
