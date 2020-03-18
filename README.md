@@ -454,14 +454,14 @@ It generates PCoA plots based on various distance metrics (Jaccard, Bray-Curtis,
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--metadata <PATH_TO_YOUR_METADATA_FILE> \
-	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 1,000]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
-	--sampling-depth 10000
+	--sampling-depth 1000
 ```
 
 2. Run the pipeline 
@@ -473,7 +473,7 @@ python 16S_pipeline.py Core_Metrics_Phylogeny --local-scheduler
 This should create `core_div_phylogeny` directory with its respective outputs.
 
 ### - Rarefaction -
-This step will rarefy feature table generated using DADA2 to a user specified sampling depth (or 10,000 if sampling depth not specified), and generate combined ASV table with the rarefied feature table.
+This step will rarefy feature table generated using DADA2 to a user specified sampling depth (or 1,000 if sampling depth not specified), and generate combined ASV table with the rarefied feature table.
 
 1. Generate configuration file.
 
@@ -483,14 +483,14 @@ This step will rarefy feature table generated using DADA2 to a user specified sa
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--metadata <PATH_TO_YOUR_METADATA_FILE> \
-	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 1,000]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
-	--sampling-depth 10000
+	--sampling-depth 1000
 ```
 
 2. Run the pipeline 
@@ -512,14 +512,14 @@ This step can be used to explore the relationship between alpha diversity and th
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--metadata <PATH_TO_YOUR_METADATA_FILE> \
-	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 1,000]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
-	--sampling-depth 10000
+	--sampling-depth 1000
 ```
 
 2. Run the pipeline 
@@ -541,14 +541,14 @@ This step will generate multiple 2D PCoA plots, each of which corresponds to a c
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--metadata <PATH_TO_YOUR_METADATA_FILE> \
-	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 1,000]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
-	--sampling-depth 10000
+	--sampling-depth 1000
 ```
 
 2. Run the pipeline 
@@ -573,14 +573,14 @@ Alternatively, you may run the commands below to generate all the outputs in the
 python luigi_config_generator.py \
 	--manifest <PATH_TO_YOUR_MANIFEST_FILE> \
 	--metadata <PATH_TO_YOUR_METADATA_FILE> \
-	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 10,000]>
+	--sampling-depth <SAMPLING_DEPTH_FOR_RAREFACTION [DEFAULT = 1,000]>
 -----------------------------------------------------------------------------
 - Actual Example -
 	
 python luigi_config_generator.py \
 	--manifest /Winnebago/danielm710/input/ManifestFile.txt \
 	--metadata /Winnebago/danielm710/input/sample-metadata.tsv \
-	--sampling-depth 10000
+	--sampling-depth 1000
 ```
 
 2. Run the pipeline 
