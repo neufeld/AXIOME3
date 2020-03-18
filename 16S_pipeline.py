@@ -749,33 +749,28 @@ class Export_Representative_Seqs(luigi.Task):
         run_cmd(cmd, self)
 
 class Convert_Biom_to_TSV(luigi.Task):
+    export_dir = Output_Dirs().export_dir
 
     def requires(self):
-        return Export_Feature_Table()
+        return Merge_Denoise()
 
     def output(self):
-        tsv = os.path.join(Output_Dirs().export_dir, "feature-table.tsv")
+        tsv = os.path.join(self.export_dir, "feature-table.tsv")
 
         return luigi.LocalTarget(tsv)
 
     def run(self):
-        step = str(self)
-        # Make output directory
+        # Make output dir
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
-                step)
+                self.export_dir],
+                self)
 
-        # Convert to TSV
-        cmd = ["biom",
-                "convert",
-                "-i",
-                self.input().path,
-                "-o",
-                self.output().path,
-                "--to-tsv"]
+        output = export_qiime_artifact.convert(self.input()["table"].path)
+        collapsed_df = output["feature_table"]
 
-        run_cmd(cmd, step)
+        collapsed_df.T.to_csv(self.output().path, sep="\t",
+                index_label="SampleID")
 
 class Generate_Combined_Feature_Table(luigi.Task):
     export_dir = Output_Dirs().export_dir
@@ -1058,6 +1053,79 @@ class Summarize_Filtered_Table(luigi.Task):
 
         run_cmd(cmd, self)
 
+class Export_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        biom = os.path.join(self.filtered_dir, "filtered_feature-table.tsv")
+
+        return luigi.LocalTarget(biom)
+
+    def run(self):
+        # Make output dir
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        output = export_qiime_artifact.convert(self.input().path)
+        collapsed_df = output["feature_table"]
+
+        collapsed_df.T.to_csv(self.output().path, sep="\t",
+                index_label="SampleID")
+
+class Generate_Combined_Filtered_Feature_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return {
+                "Export_Taxonomy": Export_Taxonomy(),
+                "Export_Representative_Seqs": Export_Representative_Seqs(),
+                "Export_Filtered_Table": Export_Filtered_Table(),
+                }
+
+    def output(self):
+        combined_table = os.path.join(self.filtered_dir, "filtered_ASV_table_combined.tsv")
+        log = os.path.join(self.filtered_dir, "ASV_table_combined.log")
+
+
+        output = {
+                "table": luigi.LocalTarget(combined_table),
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        # Run Jackson's script on pre-rarefied table
+        combined_feature_table_script = os.path.join(qiime2_helper_dir,
+                "generate_combined_feature_table.py")
+
+        cmd_pre_rarefied = [combined_feature_table_script,
+                "-f",
+                self.input()["Export_Filtered_Table"].path,
+                "-s",
+                self.input()["Export_Representative_Seqs"].path,
+                "-t",
+                self.input()["Export_Taxonomy"].path,
+                "-o",
+                self.output()["table"].path]
+
+        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, self)
+
+        # Write log files
+        with self.output()["log"].open('w') as fh:
+            fh.write(logged_pre_rarefied)
+
 # Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
@@ -1203,7 +1271,7 @@ class Rarefy(luigi.Task):
     rarefy_dir = Output_Dirs().rarefy_dir
 
     def requires(self):
-        return Merge_Denoise()
+        return Filter_Feature_Table()
 
     def output(self):
         rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
@@ -1223,7 +1291,7 @@ class Rarefy(luigi.Task):
                 "feature-table",
                 "rarefy",
                 "--i-table",
-                self.input()['table'].path,
+                self.input().path,
                 "--p-sampling-depth",
                 self.sampling_depth,
                 "--o-rarefied-table",
@@ -1261,33 +1329,28 @@ class Export_Rarefy_Feature_Table(luigi.Task):
         run_cmd(cmd, step)
 
 class Convert_Rarefy_Biom_to_TSV(luigi.Task):
+    rarefy_export_dir = Output_Dirs().rarefy_export_dir
 
     def requires(self):
-        return Export_Rarefy_Feature_Table()
+        return Filter_Feature_Table()
 
     def output(self):
-        tsv = os.path.join(Output_Dirs().rarefy_export_dir, "feature-table.tsv")
+        tsv = os.path.join(self.rarefy_export_dir, "feature-table.tsv")
 
         return luigi.LocalTarget(tsv)
 
     def run(self):
-        step = str(self)
-        # Make output directory
+        # Make output dir
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().rarefy_export_dir],
-                step)
+                self.rarefy_export_dir],
+                self)
 
-        # Convert to TSV
-        cmd = ["biom",
-                "convert",
-                "-i",
-                self.input().path,
-                "-o",
-                self.output().path,
-                "--to-tsv"]
+        output = export_qiime_artifact.convert(self.input().path)
+        collapsed_df = output["feature_table"]
 
-        run_cmd(cmd, step)
+        collapsed_df.T.to_csv(self.output().path, sep="\t",
+                index_label="SampleID")
 
 class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
     rarefy_export_dir = Output_Dirs().rarefy_export_dir
@@ -1901,6 +1964,7 @@ class Post_Analysis(luigi.Task):
     def requires(self):
         return [
                 Summarize_Filtered_Table(),
+                Generate_Combined_Filtered_Feature_Table(),
                 Core_Metrics_Phylogeny(),
                 Alpha_Group_Significance(),
                 Generate_Combined_Rarefied_Feature_Table(),
