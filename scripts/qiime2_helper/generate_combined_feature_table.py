@@ -13,6 +13,7 @@ import re
 
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
+import qiime2
 
 # GLOBAL VARIABLES
 SCRIPT_VERSION = '0.8.1'
@@ -30,17 +31,24 @@ def read_feature_table(feature_table_filepath):
     :return: QIIME2 FeatureTable[Frequency] artifact (pandas DataFrame)
     """
     # Load the table
-    feature_table = pd.read_csv(feature_table_filepath, sep = '\t', skiprows = 1, header = 0)
+    feature_table = pd.read_csv(feature_table_filepath, sep = '\t')
+    # QIIME2 compatible ID column names
+    allowed_ids = qiime2.metadata.metadata.FORMATTED_ID_HEADERS
+    # First column in the feature_table df
+    first_col = list(feature_table.columns)[0]
     
     # Check if the first column looks okay
-    if feature_table.columns.values.tolist()[0] != 'Feature ID':
-        if 'Feature ID' in feature_table.columns.values.tolist():
+    if first_col != 'Feature ID':
+        if 'Feature ID' in feature_table.columns:
             logger.error('"Feature ID" column already exists in provided feature table and is not the first column. '
                          'Cannot continue. Exiting...')
             sys.exit(1)
-        if feature_table.columns.values.tolist()[0] == '#OTU ID':
-            logger.debug('Renaming first column of feature table ("#OTU ID") to "Feature ID"')
-            feature_table = feature_table.rename(columns = {'#OTU ID': 'Feature ID'})
+        if first_col in allowed_ids:
+            logger.debug('Renaming first column of feature table ("{col}") to "Feature ID"'.format(col=first_col))
+            feature_table = feature_table.rename(columns = {first_col: 'Feature ID'})
+        elif first_col.lower() in allowed_ids:
+            logger.debug('Renaming first column of feature table ("{col}") to "Feature ID"'.format(col=first_col))
+            feature_table = feature_table.rename(columns = {first_col: 'Feature ID'})
         else:
             logger.error('Do not recognize the first column of the feature table as feature IDs. Exiting...')
             sys.exit(1)
