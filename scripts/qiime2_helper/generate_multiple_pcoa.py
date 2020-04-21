@@ -7,6 +7,7 @@ from scripts.qiime2_helper.generate_pcoa import (
 )
 
 from plotnine.ggplot import save_as_pdf_pages
+import os
 
 # Colour formatters
 formatters = {
@@ -89,6 +90,29 @@ def generate_pdf(pcoa_qza, metadata, file_name, output_dir, point_size=6):
             run_multiple(pcoa, metadata_df, point_size),
             filename=file_name,
             path=output_dir)
+
+def generate_jpegs(pcoa_qza, metadata, output_dir, point_size=6):
+    """
+    Generate and save each plot in jpeg file.
+    """
+    pcoa = convert_qiime2_2_skbio(pcoa_qza)
+
+    # Load metadata into pandas dataframe
+    metadata_df = load_metadata(metadata)
+
+    cols = metadata_df.columns
+
+    for column in cols:
+        filename = column + ".jpeg"
+        plot = generate_pcoa_plot(
+                    pcoa=pcoa,
+                    metadata_df=metadata_df,
+                    colouring_variable=str(column),
+                    shape_variable=None,
+                    point_size=point_size
+                )
+
+        plot.save(filename=filename, format="jpeg", path=output_dir)
 
 if __name__ == "__main__":
     parser = args_parse()

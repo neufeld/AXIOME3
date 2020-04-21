@@ -10,7 +10,10 @@ from textwrap import dedent
 # Import custom modules
 from scripts.qiime2_helper.summarize_sample_counts import get_sample_count
 from scripts.qiime2_helper.generate_combined_feature_table import combine_table
-from scripts.qiime2_helper.generate_multiple_pcoa import generate_pdf
+from scripts.qiime2_helper.generate_multiple_pcoa import (
+        generate_pdf,
+        generate_jpegs
+)
 
 # Define custom logger
 logger = logging.getLogger("luigi logger")
@@ -23,8 +26,8 @@ logger = logging.getLogger("luigi logger")
 #luigi.configuration.add_config_path(config_path)
 
 # Path to configuration file to be used
-config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
-luigi.configuration.add_config_path(config_path)
+#config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
+#luigi.configuration.add_config_path(config_path)
 
 # Color formatter
 formatters = {
@@ -1629,6 +1632,77 @@ class PCoA_Plots(luigi.Task):
                         self.metadata_file,
                         filename,
                         outdir)
+
+class PCoA_Plots_jpeg(luigi.Task):
+    pcoa_dir = Output_Dirs().pcoa_dir
+    metadata_file = Samples().metadata_file
+
+    unweighted_unifrac_dir = os.path.join(pcoa_dir, "unweighted_unifrac")
+    weighted_unifrac_dir = os.path.join(pcoa_dir, "weighted_unifrac")
+    bray_curtis_dir = os.path.join(pcoa_dir, "bray_curtis")
+    jaccard_dir = os.path.join(pcoa_dir, "jaccard")
+
+    def requires(self):
+        return Core_Metrics_Phylogeny()
+
+    def output(self):
+        unweighted_unifrac_pcoa = os.path.join(self.unweighted_unifrac_dir,
+                "unweighted_unifrac_pcoa_plots.done")
+        weighted_unifrac_pcoa = os.path.join(self.weighted_unifrac_dir,
+                "weighted_unifrac_pcoa_plots.done")
+        bray_curtis_pcoa = os.path.join(self.bray_curtis_dir,
+                "bray_curtis_pcoa_plots.done")
+        jaccard_pcoa = os.path.join(self.jaccard_dir,
+                "jaccard_pcoa_plots.done")
+
+        output = {
+                'unweighted_unifrac_pcoa':
+                luigi.LocalTarget(unweighted_unifrac_pcoa),
+                'weighted_unifrac_pcoa':
+                luigi.LocalTarget(weighted_unifrac_pcoa),
+                'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
+                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa)
+                }
+
+        return output
+
+    def run(self):
+        # Make sure Metadata file is provided and exists
+        if not(os.path.isfile(self.metadata_file)):
+            msg = dedent("""
+                    Metadata file is not provided or the provided Metadata file
+                    does not exist!
+                    """)
+
+            raise FileNotFoundError(msg)
+
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.pcoa_dir],
+                self)
+
+        # Input PCoA artifacts to loop through
+        # (It's identical to output keys!)
+        metrics = ['unweighted_unifrac_pcoa', 'weighted_unifrac_pcoa',
+                'jaccard_pcoa', 'bray_curtis_pcoa']
+
+        # Make PCoA plots for each distance metric
+        for metric in metrics:
+            outdir = os.path.dirname(self.output()[metric].path)
+
+            # Make sub-output directory
+            run_cmd(['mkdir',
+                    '-p',
+                    outdir],
+                    self)
+
+            generate_jpegs(
+                    self.input()[metric].path,
+                    self.metadata_file,
+                    outdir
+            )
+
 
 # Get software version info
 class Get_Version_Info(luigi.Task):
