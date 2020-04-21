@@ -9,6 +9,10 @@ from textwrap import dedent
 
 # Custom Scripts
 from scripts.qiime2_helper import export_qiime_artifact
+from scripts.qiime2_helper.filter_by_abundance import (
+    filter_by_abundance,
+    clean_taxa
+)
 
 # Define custom logger
 logger = logging.getLogger("16S-pipeline")
@@ -111,6 +115,7 @@ class Output_Dirs(luigi.Config):
     picrust_dir = os.path.join(post_analysis_dir, "PICRUST2")
 
     visualization_dir = os.path.join(out_dir, "visualization")
+    triplot_dir = os.path.join(out_dir, "triplot")
 
 class Samples(luigi.Config):
     """
@@ -121,8 +126,10 @@ class Samples(luigi.Config):
     """
     manifest_file = luigi.Parameter()
     metadata_file = luigi.Parameter(default='')
+    env_metadata_file = luigi.Parameter(default='')
     is_multiple = luigi.Parameter(default='n')
     sampling_depth = luigi.Parameter(default='1000')
+    abundance_threshold = luigi.Parameter(default='0.05')
 
     def get_samples(self):
         manifest_df = pd.read_csv(self.manifest_file, index_col=0)
@@ -1408,7 +1415,7 @@ class Subset_ASV_By_Abundance(luigi.Task):
     """
     export_dir = Output_Dirs().export_dir
     # Abundance threshold. Default is 1%
-    threshold = luigi.Parameter(default="0.01")
+    threshold = Samples().abundance_threshold
 
     def requires(self):
         return Generate_Combined_Feature_Table()
@@ -1904,6 +1911,134 @@ class PCoA_Plots(luigi.Task):
                     filename,
                     '--output-dir',
                     outdir]
+
+            run_cmd(cmd, self)
+
+class Prep_Triplot(luigi.Task):
+    triplot_dir = Output_Dirs().triplot_dir
+    threshold = Samples().abundance_threshold
+
+    def requires(self):
+        return Export_Taxa_Collapse()
+
+    def output(self):
+        filtered_domain_table = os.path.join(self.triplot_dir,
+                "{threshold}_domain_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_phylum_table = os.path.join(self.triplot_dir,
+                "{threshold}_phylum_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_class_table = os.path.join(self.triplot_dir,
+                "{threshold}_class_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_order_table = os.path.join(self.triplot_dir,
+                "{threshold}_order_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_family_table = os.path.join(self.triplot_dir,
+                "{threshold}_family_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_genus_table = os.path.join(self.triplot_dir,
+                "{threshold}_genus_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+        filtered_species_table = os.path.join(self.triplot_dir,
+                "{threshold}_species_collapsed_table.tsv".format(
+                    threshold=str(self.threshold)))
+
+        output = {
+            "domain": luigi.LocalTarget(filtered_domain_table),
+            "phylum": luigi.LocalTarget(filtered_phylum_table),
+            "class": luigi.LocalTarget(filtered_class_table),
+            "order": luigi.LocalTarget(filtered_order_table),
+            "family": luigi.LocalTarget(filtered_family_table),
+            "genus": luigi.LocalTarget(filtered_genus_table),
+            "species": luigi.LocalTarget(filtered_species_table)
+        }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.triplot_dir],
+                self)
+
+        # Taxa collapse
+        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
+                "species"]
+
+        for taxa in taxa_keys:
+            df = pd.read_csv(self.input()[taxa].path, sep='\t', index_col=0)
+            # Transpose df so that samples are in the columns
+            df_t = df.T
+
+            # Filter by abundance
+            filtered_df = filter_by_abundance(df_t, float(self.threshold))
+            # Re-transpose to make it compatible with the triplot script
+            final_df = filtered_df.T
+
+            # Clean up taxa names
+            taxa_names = final_df.columns.values
+            new_taxa_names = clean_taxa(taxa_names)
+            # Rename columns
+            final_df.columns = new_taxa_names
+
+            # Save output
+            final_df.to_csv(self.output()[taxa].path, sep="\t",
+                    index_label="SampleID")
+
+class Triplot(luigi.Task):
+    triplot_dir = Output_Dirs().triplot_dir
+    metadata_file = Samples().metadata_file
+    env_metadata_file = Samples().env_metadata_file
+    r2_threshold = luigi.Parameter(default='0.1')
+
+    def requires(self):
+        return Prep_Triplot()
+
+    def output(self):
+        domain_triplot = os.path.join(self.triplot_dir, "domain_triplot.pdf")
+        phylum_triplot = os.path.join(self.triplot_dir, "phylum_triplot.pdf")
+        class_triplot = os.path.join(self.triplot_dir, "class_triplot.pdf")
+        order_triplot = os.path.join(self.triplot_dir, "order_triplot.pdf")
+        family_triplot = os.path.join(self.triplot_dir, "family_triplot.pdf")
+        genus_triplot = os.path.join(self.triplot_dir, "genus_triplot.pdf")
+        species_triplot = os.path.join(self.triplot_dir, "species_triplot.pdf")
+
+        output = {
+            "domain": luigi.LocalTarget(domain_triplot),
+            "phylum": luigi.LocalTarget(phylum_triplot),
+            "class": luigi.LocalTarget(class_triplot),
+            "order": luigi.LocalTarget(order_triplot),
+            "family": luigi.LocalTarget(family_triplot),
+            "genus": luigi.LocalTarget(genus_triplot),
+            "species": luigi.LocalTarget(species_triplot)
+        }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(['mkdir',
+                '-p',
+                self.triplot_dir],
+                self)
+
+        # Taxa collapse
+        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
+                "species"]
+
+        triplot_script = os.path.join(script_dir, "pcoa_triplot.R")
+        for taxa in taxa_keys:
+            # Run triplot R script
+            cmd = ['Rscript',
+                    triplot_script,
+                    self.input()[taxa].path,
+                    self.metadata_file,
+                    self.env_metadata_file,
+                    self.r2_threshold,
+                    self.output()[taxa].path
+            ]
 
             run_cmd(cmd, self)
 
