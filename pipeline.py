@@ -113,12 +113,15 @@ class Output_Dirs(luigi.Config):
     export_dir = os.path.join(out_dir, "exported")
     rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
     phylogeny_dir = os.path.join(out_dir, "phylogeny")
-    core_metric_dir = os.path.join(out_dir, "core_div_phylogeny")
+
+    post_analysis_dir = os.path.join(out_dir, "post_analysis")
+    core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
+    alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
+    pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
+    faprotax_dir = os.path.join(post_analysis_dir, "FAPROTAX")
+    picrust_dir = os.path.join(post_analysis_dir, "PICRUST2")
+
     visualization_dir = os.path.join(out_dir, "visualization")
-    alpha_sig_dir = os.path.join(out_dir, "alpha_group_significance")
-    pcoa_dir = os.path.join(out_dir, "pcoa_plots")
-    faprotax_dir = os.path.join(out_dir, "FAPROTAX")
-    picrust_dir = os.path.join(out_dir, "PICRUST2")
 
 class Samples(luigi.Config):
     """
@@ -1703,7 +1706,6 @@ class PCoA_Plots_jpeg(luigi.Task):
                     outdir
             )
 
-
 # Get software version info
 class Get_Version_Info(luigi.Task):
     out_dir = Output_Dirs().out_dir
@@ -1763,6 +1765,7 @@ class Post_Analysis(luigi.Task):
                 Alpha_Group_Significance(),
                 Generate_Combined_Rarefied_Feature_Table(),
                 PCoA_Plots(),
+                PCoA_Plots_jpeg(),
                 Get_Version_Info()
         ]
 
