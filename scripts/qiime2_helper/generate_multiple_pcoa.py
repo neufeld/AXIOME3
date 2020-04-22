@@ -7,7 +7,7 @@ from scripts.qiime2_helper.generate_pcoa import (
 )
 
 from plotnine.ggplot import save_as_pdf_pages
-import os
+import json
 
 # Colour formatters
 formatters = {
@@ -113,6 +113,24 @@ def generate_jpegs(pcoa_qza, metadata, output_dir, point_size=6):
                 )
 
         plot.save(filename=filename, format="jpeg", path=output_dir)
+
+def save_as_json(metadata, output_path):
+    """
+    Save metadata columns as json for web server to use
+    """
+    # Load metadata into pandas dataframe
+    metadata_df = load_metadata(metadata)
+
+    cols = metadata_df.columns
+
+    data = {}
+
+    for column in cols:
+        filename = column + ".jpeg"
+        data[column] = filename
+
+    with open(output_path, 'w') as fh:
+        json.dump(data, fh)
 
 if __name__ == "__main__":
     parser = args_parse()
