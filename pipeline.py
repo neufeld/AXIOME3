@@ -12,7 +12,8 @@ from scripts.qiime2_helper.summarize_sample_counts import get_sample_count
 from scripts.qiime2_helper.generate_combined_feature_table import combine_table
 from scripts.qiime2_helper.generate_multiple_pcoa import (
         generate_pdf,
-        generate_jpegs
+        generate_jpegs,
+        save_as_json
 )
 
 # Define custom logger
@@ -1657,6 +1658,8 @@ class PCoA_Plots_jpeg(luigi.Task):
                 "bray_curtis_pcoa_plots.done")
         jaccard_pcoa = os.path.join(self.jaccard_dir,
                 "jaccard_pcoa_plots.done")
+        json_summary = os.path.join(self.pcoa_dir,
+                "pcoa_columns.json")
 
         output = {
                 'unweighted_unifrac_pcoa':
@@ -1664,7 +1667,8 @@ class PCoA_Plots_jpeg(luigi.Task):
                 'weighted_unifrac_pcoa':
                 luigi.LocalTarget(weighted_unifrac_pcoa),
                 'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
-                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa)
+                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa),
+                'json': luigi.LocalTarget(json_summary)
                 }
 
         return output
@@ -1705,6 +1709,8 @@ class PCoA_Plots_jpeg(luigi.Task):
                     self.metadata_file,
                     outdir
             )
+
+        save_as_json(self.metadata_file, self.output()['json'].path)
 
 # Get software version info
 class Get_Version_Info(luigi.Task):
