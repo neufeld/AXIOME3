@@ -10,6 +10,7 @@ from textwrap import dedent
 # Import custom modules
 from scripts.qiime2_helper.summarize_sample_counts import get_sample_count
 from scripts.qiime2_helper.generate_combined_feature_table import combine_table
+from scripts.qiime2_helper import export_qiime_artifact
 from scripts.qiime2_helper.generate_multiple_pcoa import (
         generate_pdf,
         generate_jpegs,
@@ -117,6 +118,7 @@ class Output_Dirs(luigi.Config):
     collapse_dir = os.path.join(out_dir, "taxa_collapse")
 
     post_analysis_dir = os.path.join(out_dir, "post_analysis")
+    filtered_dir = os.path.join(post_analysis_dir, "filtered")
     core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
     alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
@@ -992,6 +994,118 @@ class Export_Taxa_Collapse(luigi.Task):
                     index_label="SampleID")
 
 # Post Analysis
+# Filter sample by metadata
+class Filter_Feature_Table(luigi.Task):
+    metadata_file = Samples().metadata_file
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        filtered_table = os.path.join(self.filtered_dir, "filtered_table.qza")
+
+        return luigi.LocalTarget(filtered_table)
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        # filter-sample command
+        cmd = ["qiime",
+                "feature-table",
+                "filter-samples",
+                "--i-table",
+                self.input()["table"].path,
+                "--m-metadata-file",
+                self.metadata_file,
+                "--o-filtered-table",
+                self.output().path]
+
+        run_cmd(cmd, self)
+
+class Summarize_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        summary_file = os.path.join(self.filtered_dir,
+                "filtered_table_summary.txt")
+
+        return luigi.LocalTarget(summary_file)
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        get_sample_count(self.input().path, self.output().path)
+
+class Export_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        biom = os.path.join(self.filtered_dir, "filtered_feature-table.tsv")
+
+        return luigi.LocalTarget(biom)
+
+    def run(self):
+        # Make output dir
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        output = export_qiime_artifact.convert(self.input().path)
+        collapsed_df = output["feature_table"]
+
+        collapsed_df.T.to_csv(self.output().path, sep="\t",
+                index_label="SampleID")
+
+class Generate_Combined_Filtered_Feature_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return {
+                "Export_Taxonomy": Export_Taxonomy(),
+                "Export_Representative_Seqs": Export_Representative_Seqs(),
+                "Export_Filtered_Table": Export_Filtered_Table(),
+                }
+
+    def output(self):
+        combined_table = os.path.join(self.filtered_dir, "filtered_ASV_table_combined.tsv")
+        log = os.path.join(self.filtered_dir, "ASV_table_combined.log")
+
+
+        output = {
+                "table": luigi.LocalTarget(combined_table),
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        combine_table(self.input()["Export_Filtered_Table"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["table"].path)
+
 # Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
@@ -1873,6 +1987,7 @@ class Core_Analysis(luigi.Task):
                 Sample_Count_Summary(),
                 Sequence_Tabulate(),
                 Taxonomy_Tabulate(),
+                Export_Taxa_Collapse(),
                 Get_Version_Info()
                 ]
 
@@ -1886,11 +2001,13 @@ class Core_Analysis(luigi.Task):
 class Post_Analysis(luigi.Task):
     def requires(self):
         return [
+                Core_Analysis(),
+                Summarize_Filtered_Table(),
+                Generate_Combined_Filtered_Feature_Table(),
                 Core_Metrics_Phylogeny(),
                 Alpha_Group_Significance(),
                 Generate_Combined_Rarefied_Feature_Table(),
                 PCoA_Plots(),
-                PCoA_Plots_jpeg(),
                 Get_Version_Info()
         ]
 
