@@ -11,11 +11,9 @@ import logging
 import argparse
 import re
 
-# biopython not installing for some reason in docker
-#from Bio.SeqIO.FastaIO import SimpleFastaParser
-# Using custom script instead for parsing fasta file
-from scripts.qiime2_helper.fasta_parser import get_id_and_seq
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
+import qiime2
 
 # GLOBAL VARIABLES
 SCRIPT_VERSION = '0.8.1'
@@ -33,17 +31,24 @@ def read_feature_table(feature_table_filepath):
     :return: QIIME2 FeatureTable[Frequency] artifact (pandas DataFrame)
     """
     # Load the table
-    feature_table = pd.read_csv(feature_table_filepath, sep = '\t', skiprows = 1, header = 0)
+    feature_table = pd.read_csv(feature_table_filepath, sep = '\t')
+    # QIIME2 compatible ID column names
+    allowed_ids = qiime2.metadata.metadata.FORMATTED_ID_HEADERS
+    # First column in the feature_table df
+    first_col = list(feature_table.columns)[0]
     
     # Check if the first column looks okay
-    if feature_table.columns.values.tolist()[0] != 'Feature ID':
-        if 'Feature ID' in feature_table.columns.values.tolist():
+    if first_col != 'Feature ID':
+        if 'Feature ID' in feature_table.columns:
             logger.error('"Feature ID" column already exists in provided feature table and is not the first column. '
                          'Cannot continue. Exiting...')
             sys.exit(1)
-        if feature_table.columns.values.tolist()[0] == '#OTU ID':
-            logger.debug('Renaming first column of feature table ("#OTU ID") to "Feature ID"')
-            feature_table = feature_table.rename(columns = {'#OTU ID': 'Feature ID'})
+        if first_col in allowed_ids:
+            logger.debug('Renaming first column of feature table ("{col}") to "Feature ID"'.format(col=first_col))
+            feature_table = feature_table.rename(columns = {first_col: 'Feature ID'})
+        elif first_col.lower() in allowed_ids:
+            logger.debug('Renaming first column of feature table ("{col}") to "Feature ID"'.format(col=first_col))
+            feature_table = feature_table.rename(columns = {first_col: 'Feature ID'})
         else:
             logger.error('Do not recognize the first column of the feature table as feature IDs. Exiting...')
             sys.exit(1)
@@ -92,12 +97,13 @@ def add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath):
     # Load the FastA file as a pandas dataframe
     # Based on https://stackoverflow.com/a/19452991 (accessed Sept. 12, 2019)
     logger.info('Loading representative sequences FastA file')
-    fasta_ids = []
-    fasta_seqs = []
+    with open(rep_seq_filepath, 'r') as fasta_data:
+        fasta_ids = []
+        fasta_seqs = []
 
-    for _id, seq in get_id_and_seq(rep_seq_filepath):
-        fasta_ids.append(_id)
-        fasta_seqs.append(seq)
+        for id, seq in SimpleFastaParser(fasta_data):
+            fasta_ids.append(id)
+            fasta_seqs.append(seq)
 
     rep_seq_dict = {'Feature ID': fasta_ids, 'ReprSequence': fasta_seqs}
     rep_seq_table = pd.DataFrame(rep_seq_dict)
@@ -205,15 +211,26 @@ def combine_table(feature_table_filepath, rep_seq_filepath, taxonomy_filepath,
         - taxonomy_filepath: taxonomy classification file (.tsv)
         - output_filepath: Path to save output
     """
+
     feature_table = read_feature_table(feature_table_filepath)
+
     # Add taxonomy information
-    feature_table = add_taxonomy_to_feature_table(feature_table, taxonomy_filepath)
+    feature_table = add_taxonomy_to_feature_table(
+            feature_table,
+            taxonomy_filepath
+    )
     # Add row IDs as column in the beginning
     feature_table = add_row_id(feature_table)
+
     # Add representative sequences
-    feature_table = add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath)
+    feature_table = add_rep_seqs_to_feature_table(
+            feature_table,
+            rep_seq_filepath
+    )
+
     # Save output
-    feature_table.to_csv(output_filepath, sep = '\t', index = False)
+    feature_table.to_csv(output_filepath, sep = '\t', index
+                                = False)
 
 def main(args):
     # Set user variables
