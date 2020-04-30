@@ -356,7 +356,7 @@ class Denoise(luigi.Task):
     trunc_len_f = luigi.Parameter(default="250")
     trim_left_r = luigi.Parameter(default="20")
     trunc_len_r = luigi.Parameter(default="250")
-    n_threads = luigi.Parameter(default="10")
+    n_cores = luigi.Parameter(default="1")
 
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
@@ -627,7 +627,7 @@ class Sample_Count_Summary(luigi.Task):
 
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
-    n_jobs = luigi.Parameter(default="10")
+    n_cores = luigi.Parameter(default="1")
 
     taxonomy_dir = Output_Dirs().taxonomy_dir
 
@@ -663,7 +663,7 @@ class Taxonomic_Classification(luigi.Task):
                 "--o-classification",
                 self.output()["taxonomy"].path,
                 "--p-n-jobs",
-                self.n_jobs,
+                self.n_cores,
                 "--verbose"]
 
         output = run_cmd(cmd, self)
@@ -762,7 +762,7 @@ class Export_Representative_Seqs(luigi.Task):
 class Convert_Biom_to_TSV(luigi.Task):
 
     def requires(self):
-        return Export_Feature_Table()
+        return Merge_Denoise()
 
     def output(self):
         tsv = os.path.join(Output_Dirs().export_dir, "feature-table.tsv")
@@ -778,15 +778,16 @@ class Convert_Biom_to_TSV(luigi.Task):
                 step)
 
         # Convert to TSV
-        cmd = ["biom",
-                "convert",
-                "-i",
-                self.input().path,
-                "-o",
-                self.output().path,
-                "--to-tsv"]
+        output = export_qiime_artifact.convert(self.input()["table"].path)
+        collapsed_df = output["feature_table"]
 
-        run_cmd(cmd, step)
+        collapsed_df.T.to_csv(
+            self.output().path,
+            sep="\t",
+            index_label="SampleID"
+        )
+
+        
 
 class Generate_Combined_Feature_Table(luigi.Task):
     export_dir = Output_Dirs().export_dir
