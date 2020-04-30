@@ -11,7 +11,6 @@ import logging
 import argparse
 import re
 
-from Bio.SeqIO.FastaIO import SimpleFastaParser
 import pandas as pd
 import qiime2
 
