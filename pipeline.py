@@ -82,9 +82,10 @@ def run_cmd(cmd, step):
                                 RED=formatters['RED'],
                                 END=formatters['END'])
 
+        web_err_msg = "<-->" + combined_msg + "<-->"
 
         logger.error(err_msg)
-        raise ValueError(err_msg)
+        raise ValueError(web_err_msg)
     else:
         return stdout
 
