@@ -31,13 +31,6 @@ logger = logging.getLogger("luigi logger")
 #config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
 #luigi.configuration.add_config_path(config_path)
 
-# Color formatter
-formatters = {
-        'RED': '\033[91m',
-        'GREEN': '\033[92m',
-        'END': '\033[0m'
-        }
-
 # Script directory
 script_dir = "scripts"
 
@@ -77,10 +70,8 @@ def run_cmd(cmd, step):
         combined_msg = (stdout + stderr).decode('utf-8')
         err_msg = "In {step}, the following command, : ".format(step=step) + \
                 "{cmd}\n\n".format(cmd=cmd) + \
-                "resulted in an error:\n{RED}{combined_msg}{END}"\
-                        .format(combined_msg=combined_msg,
-                                RED=formatters['RED'],
-                                END=formatters['END'])
+                "resulted in an error:\n{combined_msg}"\
+                        .format(combined_msg=combined_msg)
 
         web_err_msg = "<-->" + combined_msg + "<-->"
 
@@ -499,7 +490,7 @@ class Denoise(luigi.Task):
                         "--p-trunc-len-r",
                         self.trunc_len_r,
                         "--p-n-threads",
-                        self.n_threads,
+                        self.n_cores,
                         "--o-table",
                         self.output()[str(sample)]["table"].path,
                         "--o-representative-sequences",
@@ -529,7 +520,7 @@ class Denoise(luigi.Task):
                     "--p-trunc-len-r",
                     self.trunc_len_r,
                     "--p-n-threads",
-                    self.n_threads,
+                    self.n_cores,
                     "--o-table",
                     self.output()["table"].path,
                     "--o-representative-sequences",
