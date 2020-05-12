@@ -11,7 +11,7 @@ import logging
 import argparse
 import re
 
-from fasta_parser import get_id_and_seq
+from scripts.qiime2_helper.fasta_parser import get_id_and_seq
 import pandas as pd
 import qiime2
 
