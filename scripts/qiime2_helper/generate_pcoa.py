@@ -166,7 +166,11 @@ def generate_pcoa_plot(pcoa,
         metadata_df,
         colouring_variable,
         shape_variable=None,
-        point_size=6):
+        alpha=0.8,
+        stroke=0.6,
+        point_size=6,
+        PC_axis1='PC1',
+        PC_axis2='PC2'):
 
     # Inner join metadata file with ordinations
     pcoa_coords = pcoa.samples
@@ -199,19 +203,19 @@ def generate_pcoa_plot(pcoa,
         secondary_target_fill = str(shape_variable)
 
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x='PC1',
-                            y='PC2',
+                        aes(x=PC_axis1,
+                            y=PC_axis2,
                             fill=primary_target_fill,
                             shape=secondary_target_fill))
     else:
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x='PC1',
-                            y='PC2',
+                        aes(x=PC_axis1,
+                            y=PC_axis2,
                             fill=primary_target_fill))
 
     # Plot the data
     pcoa_plot = (ggplot_obj
-    + geom_point(size=point_size, alpha=0.6, stroke=0.5)
+    + geom_point(size=point_size, alpha=alpha, stroke=stroke)
     + theme_bw()
     + theme(panel_grid=element_blank(), 
             line=element_line(colour='black'),
@@ -220,8 +224,8 @@ def generate_pcoa_plot(pcoa,
            legend_key=element_blank(),
            legend_key_height=5,
            text=element_text(family='Arial', colour='black'))
-    + xlab('PC1 (' + x_explained + '%)')
-    + ylab('PC2 (' + y_explained + '%)'))
+    + xlab(PC_axis1 + ' (' + x_explained + '%)')
+    + ylab(PC_axis2 + ' (' + y_explained + '%)'))
 
     # Custom colours
     color_len = len(pcoa_data_samples[colouring_variable].unique())
