@@ -103,19 +103,37 @@ def load_metadata(metadata_path):
     metadata_df = pd.read_csv(metadata_path, sep='\t', comment='#', index_col=0)
     # Rename index
     metadata_df.index.names = ['SampleID']
-    # Replace space characters with underscore
-    metadata_df.columns = metadata_df.columns.str.replace(' ', '_')
 
     return metadata_df
+
+def check_metadata(metadata_df, target_primary, target_secondary=None):
+    """
+    Check if metadata has specified target columns
+    """
+    # Make sure user specified target columns actually exist in the dataframe
+    if(target_primary not in metadata_df.columns):
+        msg = "Column '{column}' does NOT exist in the metadata!".format(
+                column=target_primary
+                )
+
+        raise ValueError(msg)
+
+    if(target_secondary is not None and
+        target_secondary not in metadata_df.columns):
+        msg = "Column '{column}' does NOT exist in the metadata!".format(
+                column=target_secondary
+                )
+
+        raise ValueError(msg)
 
 # Add a custom colour scale onto a plotnine ggplot
 def add_discrete_fill_colours(plot, n_colours, name):
     n_colours = int(n_colours)
 
-    if n_colours <= 8:
+    if n_colours <= 9:
         plot = plot + scale_fill_brewer(type='qual',palette='Set1',name=name)
-    elif (n_colours >= 9) & (n_colours <= 12):
-        plot = plot + scale_fill_brewer(type='qual',palette='Set3',name=name)
+    elif (n_colours >= 10) & (n_colours <= 12):
+        plot = plot + scale_fill_brewer(type='qual',palette='Paired',name=name)
     elif n_colours > 12:
         plot = plot
 
@@ -134,11 +152,25 @@ def add_discrete_shape(plot, n_shapes, name):
 
     return plot
 
+def convert_to_category(df, col):
+    """
+    Convert given column type to category
+    """
+    # Non-existent column exception should be caught by pandas library
+
+    df[col] = df[col].astype('category')
+
+    return df
+
 def generate_pcoa_plot(pcoa,
         metadata_df,
         colouring_variable,
         shape_variable=None,
-        point_size=6):
+        alpha=0.8,
+        stroke=0.6,
+        point_size=6,
+        PC_axis1='PC1',
+        PC_axis2='PC2'):
 
     # Inner join metadata file with ordinations
     pcoa_coords = pcoa.samples
@@ -154,47 +186,36 @@ def generate_pcoa_plot(pcoa,
     x_explained = str(round(proportions[0] * 100, 1))
     y_explained = str(round(proportions[1] * 100, 1))
 
-    # Make sure user specified target columns actually exist in the dataframe
-    colouring_variable = colouring_variable.replace(' ', '_')
-    shape_variable = shape_variable.replace(' ', '_') \
-            if shape_variable != None \
-            else None
-
-    if(colouring_variable not in pcoa_data_samples.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=colouring_variable
-                )
-
-        raise ValueError(msg)
-
-    if(shape_variable is not None and
-            shape_variable not in pcoa_data_samples.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=shape_variable
-                )
-
-        raise ValueError(msg)
-
-    # Pre-format target variables
-    primary_target_fill = 'factor(' + str(colouring_variable) + ')'
+    # Convert user specified columns to category
+    # **BIG ASSUMPTION HERE**
+    pcoa_data_samples = convert_to_category(pcoa_data_samples,
+            colouring_variable)
 
     if(shape_variable is not None):
-        secondary_target_fill = 'factor(' + str(shape_variable) + ')'
+        pcoa_data_samples = convert_to_category(pcoa_data_samples,
+                shape_variable)
+
+    # Pre-format target variables
+    #primary_target_fill = 'factor(' + str(colouring_variable) + ')'
+    primary_target_fill = str(colouring_variable)
+
+    if(shape_variable is not None):
+        secondary_target_fill = str(shape_variable)
 
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x='PC1',
-                            y='PC2',
+                        aes(x=PC_axis1,
+                            y=PC_axis2,
                             fill=primary_target_fill,
                             shape=secondary_target_fill))
     else:
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x='PC1',
-                            y='PC2',
+                        aes(x=PC_axis1,
+                            y=PC_axis2,
                             fill=primary_target_fill))
 
     # Plot the data
     pcoa_plot = (ggplot_obj
-    + geom_point(size=point_size, alpha=0.6, stroke=0.5)
+    + geom_point(size=point_size, alpha=alpha, stroke=stroke)
     + theme_bw()
     + theme(panel_grid=element_blank(), 
             line=element_line(colour='black'),
@@ -203,8 +224,8 @@ def generate_pcoa_plot(pcoa,
            legend_key=element_blank(),
            legend_key_height=5,
            text=element_text(family='Arial', colour='black'))
-    + xlab('PC1 (' + x_explained + '%)')
-    + ylab('PC2 (' + y_explained + '%)'))
+    + xlab(PC_axis1 + ' (' + x_explained + '%)')
+    + ylab(PC_axis2 + ' (' + y_explained + '%)'))
 
     # Custom colours
     color_len = len(pcoa_data_samples[colouring_variable].unique())
@@ -243,6 +264,33 @@ def save_plot(pcoa_plot, output_pdf_filepath):
              height=pdf_height_mm,
              units='mm')
 
+def make_plot_from_scratch(
+        pcoa_qza,
+        metadata,
+        colouring_variable,
+        shape_variable=None,
+        alpha=0.8,
+        stroke=0.6,
+        point_size=6,
+        PC_axis1='PC1',
+        PC_axis2='PC2'
+        ):
+
+    pcoa = convert_qiime2_2_skbio(pcoa_qza)
+    metadata_df = load_metadata(metadata)
+
+    pcoa_plot = generate_pcoa_plot(
+            pcoa=pcoa,
+            metadata_df=metadata_df,
+            colouring_variable=colouring_variable,
+            shape_variable=shape_variable,
+            alpha=alpha,
+            stroke=stroke,
+            point_size=point_size,
+            PC_axis1=PC_axis1,
+            PC_axis2=PC_axis2
+            )
+
 if __name__ == "__main__":
     parser = args_parse()
 
@@ -258,6 +306,9 @@ if __name__ == "__main__":
 
     # Load metadata
     metadata_df = load_metadata(args.metadata)
+
+    # Check if metadata has target columns
+    check_metadata(metadata_df, args.target_primary, args.target_secondary)
 
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
