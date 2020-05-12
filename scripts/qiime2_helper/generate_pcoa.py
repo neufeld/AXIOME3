@@ -264,6 +264,33 @@ def save_plot(pcoa_plot, output_pdf_filepath):
              height=pdf_height_mm,
              units='mm')
 
+def make_plot_from_scratch(
+        pcoa_qza,
+        metadata,
+        colouring_variable,
+        shape_variable=None,
+        alpha=0.8,
+        stroke=0.6,
+        point_size=6,
+        PC_axis1='PC1',
+        PC_axis2='PC2'
+        ):
+
+    pcoa = convert_qiime2_2_skbio(pcoa_qza)
+    metadata_df = load_metadata(metadata)
+
+    pcoa_plot = generate_pcoa_plot(
+            pcoa=pcoa,
+            metadata_df=metadata_df,
+            colouring_variable=colouring_variable,
+            shape_variable=shape_variable,
+            alpha=alpha,
+            stroke=stroke,
+            point_size=point_size,
+            PC_axis1=PC_axis1,
+            PC_axis2=PC_axis2
+            )
+
 if __name__ == "__main__":
     parser = args_parse()
 
