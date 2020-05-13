@@ -106,7 +106,7 @@ def load_metadata(metadata_path):
 
     return metadata_df
 
-def check_metadata(metadata_df, target_primary, target_secondary=None):
+def check_column_exists(metadata_df, target_primary, target_secondary=None):
     """
     Check if metadata has specified target columns
     """
@@ -308,7 +308,7 @@ if __name__ == "__main__":
     metadata_df = load_metadata(args.metadata)
 
     # Check if metadata has target columns
-    check_metadata(metadata_df, args.target_primary, args.target_secondary)
+    check_column_exists(metadata_df, args.target_primary, args.target_secondary)
 
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
