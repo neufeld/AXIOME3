@@ -5,7 +5,10 @@ Written by Daniel Min, Neufeld Research Group, 2019
 """
 from argparse import ArgumentParser
 from skbio.stats import ordination
-from qiime2 import Artifact
+from qiime2 import (
+    Artifact,
+    Metadata
+)
 import sys
 import os
 import pandas as pd
@@ -99,14 +102,23 @@ def convert_qiime2_2_skbio(pcoa_artifact):
     return pcoa
 
 def load_metadata(metadata_path):
-    # Load metadata into pandas dataframe
-    metadata_df = pd.read_csv(metadata_path, sep='\t', comment='#', index_col=0)
+    # Use QIIME2 Metadata API to load metadata
+    metadata_obj = Metadata.load(metadata_path)
+    metadata_df = metadata_obj.to_dataframe()
+
     # Rename index
     metadata_df.index.names = ['SampleID']
+    # By default, pandas treats string as object
+    # Convert object dtype to category
+    cols = metadata_df.columns
+    object_type_cols = cols[metadata_df.dtypes == object]
+
+    for col in object_type_cols:
+        convert_col_dtype(metadata_df, col, "category")
 
     return metadata_df
 
-def check_metadata(metadata_df, target_primary, target_secondary=None):
+def check_column_exists(metadata_df, target_primary, target_secondary=None):
     """
     Check if metadata has specified target columns
     """
@@ -152,13 +164,12 @@ def add_discrete_shape(plot, n_shapes, name):
 
     return plot
 
-def convert_to_category(df, col):
+def convert_col_dtype(df, col, dtype):
     """
     Convert given column type to category
     """
     # Non-existent column exception should be caught by pandas library
-
-    df[col] = df[col].astype('category')
+    df[col] = df[col].astype(dtype)
 
     return df
 
@@ -166,6 +177,8 @@ def generate_pcoa_plot(pcoa,
         metadata_df,
         colouring_variable,
         shape_variable=None,
+        primary_dtype="category",
+        secondary_dtype="category",
         alpha=0.8,
         stroke=0.6,
         point_size=6,
@@ -188,12 +201,16 @@ def generate_pcoa_plot(pcoa,
 
     # Convert user specified columns to category
     # **BIG ASSUMPTION HERE**
-    pcoa_data_samples = convert_to_category(pcoa_data_samples,
-            colouring_variable)
+    pcoa_data_samples = convert_col_dtype(
+            pcoa_data_samples,
+            colouring_variable,
+            primary_dtype)
 
     if(shape_variable is not None):
-        pcoa_data_samples = convert_to_category(pcoa_data_samples,
-                shape_variable)
+        pcoa_data_samples = convert_col_dtype(
+                pcoa_data_samples,
+                shape_variable,
+                secondary_dtype)
 
     # Pre-format target variables
     #primary_target_fill = 'factor(' + str(colouring_variable) + ')'
@@ -264,33 +281,6 @@ def save_plot(pcoa_plot, output_pdf_filepath):
              height=pdf_height_mm,
              units='mm')
 
-def make_plot_from_scratch(
-        pcoa_qza,
-        metadata,
-        colouring_variable,
-        shape_variable=None,
-        alpha=0.8,
-        stroke=0.6,
-        point_size=6,
-        PC_axis1='PC1',
-        PC_axis2='PC2'
-        ):
-
-    pcoa = convert_qiime2_2_skbio(pcoa_qza)
-    metadata_df = load_metadata(metadata)
-
-    pcoa_plot = generate_pcoa_plot(
-            pcoa=pcoa,
-            metadata_df=metadata_df,
-            colouring_variable=colouring_variable,
-            shape_variable=shape_variable,
-            alpha=alpha,
-            stroke=stroke,
-            point_size=point_size,
-            PC_axis1=PC_axis1,
-            PC_axis2=PC_axis2
-            )
-
 if __name__ == "__main__":
     parser = args_parse()
 
@@ -308,7 +298,7 @@ if __name__ == "__main__":
     metadata_df = load_metadata(args.metadata)
 
     # Check if metadata has target columns
-    check_metadata(metadata_df, args.target_primary, args.target_secondary)
+    check_column_exists(metadata_df, args.target_primary, args.target_secondary)
 
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
