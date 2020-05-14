@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from argparse import ArgumentParser
 import sys
+import re
 
 def args_parse():
     """
@@ -155,6 +156,23 @@ def merge_df(dropped, asv_filtered, cols_to_insert_at_beginning):
     df = pd.concat([insert_at_beginning, asv_filtered, insert_at_end], axis=1)
 
     return df
+
+def clean_taxa(taxa):
+    """
+    Clean up SILVA taxonomic names
+
+    Input:
+        - taxa: list of SILVA taxa names
+    """
+    new_taxa = [t.replace(";__", "") for t in taxa]
+    new_taxa = [re.sub(r";\s*D_[1-9]__metagenome", "", t) for t in new_taxa]
+    new_taxa = [t.replace("Ambiguous_taxa", "") for t in new_taxa]
+    new_taxa = [re.sub(r';\s*D_[1-9]__uncultured.*', '', t) for t in new_taxa]
+    new_taxa = [re.sub(r'\s*D_[0-9]__', '', t) for t in new_taxa]
+    new_taxa = [re.sub(r'.*;', '', t) for t in new_taxa]
+
+    return new_taxa
+
 
 if __name__ == "__main__":
     parser = args_parse()
