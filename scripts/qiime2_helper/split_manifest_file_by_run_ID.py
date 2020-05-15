@@ -55,7 +55,8 @@ def main(args):
         single_run_table = manifest_table[manifest_table['run_ID'] == run_ID]
         # Drop run_ID column
         single_run_table = single_run_table.drop(['run_ID'], axis=1)
-        pd.DataFrame.to_csv(single_run_table, output_filepath, index = False)
+        if(single_run_table.shape[0] != 0):
+            pd.DataFrame.to_csv(single_run_table, output_filepath, index = False)
     
     logger.info(os.path.basename(sys.argv[0]) + ": done.")
 
