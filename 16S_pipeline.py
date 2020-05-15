@@ -179,7 +179,7 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(script_dir,
+            split_script = os.path.join(qiime2_helper_dir,
                     "split_manifest_file_by_run_ID.py")
 
             cmd = ['python',
