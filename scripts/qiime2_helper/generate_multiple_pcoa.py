@@ -91,9 +91,9 @@ def generate_pdf(pcoa_qza, metadata, file_name, output_dir, point_size=6):
             filename=file_name,
             path=output_dir)
 
-def generate_jpegs(pcoa_qza, metadata, output_dir, point_size=6):
+def generate_images(pcoa_qza, metadata, output_dir, point_size=6, image_format='png'):
     """
-    Generate and save each plot in jpeg file.
+    Generate and save each plot in png file.
     """
     pcoa = convert_qiime2_2_skbio(pcoa_qza)
 
@@ -103,7 +103,7 @@ def generate_jpegs(pcoa_qza, metadata, output_dir, point_size=6):
     cols = metadata_df.columns
 
     for column in cols:
-        filename = column + ".jpeg"
+        filename = column + "." + image_format
         plot = generate_pcoa_plot(
                     pcoa=pcoa,
                     metadata_df=metadata_df,
@@ -112,9 +112,9 @@ def generate_jpegs(pcoa_qza, metadata, output_dir, point_size=6):
                     point_size=point_size
                 )
 
-        plot.save(filename=filename, format="jpeg", path=output_dir)
+        plot.save(filename=filename, format=image_format, path=output_dir)
 
-def save_as_json(metadata, output_path):
+def save_as_json(metadata, output_path, image_format='png'):
     """
     Save metadata columns as json for web server to use
     """
@@ -126,7 +126,7 @@ def save_as_json(metadata, output_path):
     data = {}
 
     for column in cols:
-        filename = column + ".jpeg"
+        filename = column + "." + image_format
         data[column] = filename
 
     with open(output_path, 'w') as fh:

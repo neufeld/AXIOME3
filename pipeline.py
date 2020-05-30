@@ -13,7 +13,7 @@ from scripts.qiime2_helper.generate_combined_feature_table import combine_table
 from scripts.qiime2_helper import export_qiime_artifact
 from scripts.qiime2_helper.generate_multiple_pcoa import (
         generate_pdf,
-        generate_jpegs,
+        generate_images,
         save_as_json
 )
 
@@ -1930,7 +1930,7 @@ class PCoA_Plots_jpeg(luigi.Task):
                     outdir],
                     self)
 
-            generate_jpegs(
+            generate_images(
                     self.input()[metric].path,
                     self.metadata_file,
                     outdir
