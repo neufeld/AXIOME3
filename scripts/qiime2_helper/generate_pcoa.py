@@ -57,11 +57,36 @@ def args_parse():
             type=int,
             default=6)
 
+    parser.add_argument('--alpha', help="""
+            Transparency scale from 0 to 1. 0 means fully transparent. Default
+            0.9.
+            """,
+            type=float,
+            default=0.9)
+
+    parser.add_argument('--stroke', help="""
+            Border thickness. 0 means no border. Default 0.6
+            """,
+            type=float,
+            default=0.6)
+
+    parser.add_argument('--pc-axis-one', help="""
+            First PC axis to plot. Default PC1
+            """,
+            type=str,
+            default="PC1")
+
+    parser.add_argument('--pc-axis-two', help="""
+            Second PC axis to plot. Default PC2
+            """,
+            type=str,
+            default="PC2")
+
     parser.add_argument('--output', help="""
             Path to store output as (extenstion should be .pdf)
             """,
             type=str,
-            default="PCoA_plot.pdf")
+            default="PCoA_plot")
 
     return parser
 
@@ -142,9 +167,9 @@ def check_column_exists(metadata_df, target_primary, target_secondary=None):
 def add_discrete_fill_colours(plot, n_colours, name):
     n_colours = int(n_colours)
 
-    if n_colours <= 9:
+    if n_colours <= 8:
         plot = plot + scale_fill_brewer(type='qual',palette='Set1',name=name)
-    elif (n_colours >= 10) & (n_colours <= 12):
+    elif (n_colours >= 9) & (n_colours <= 12):
         plot = plot + scale_fill_brewer(type='qual',palette='Paired',name=name)
     elif n_colours > 12:
         plot = plot
@@ -180,7 +205,7 @@ def generate_pcoa_plot(
     shape_variable=None,
     primary_dtype="category",
     secondary_dtype="category",
-    alpha=0.8,
+    alpha=0.9,
     stroke=0.6,
     point_size=6,
     PC_axis1='PC1',
@@ -314,10 +339,15 @@ if __name__ == "__main__":
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
             pcoa = pcoa,
-            metadata_df = args.metadata,
+            metadata = args.metadata,
             colouring_variable = args.target_primary,
             shape_variable = args.target_secondary,
-            point_size = args.point_size)
+            point_size = args.point_size,
+            alpha = args.alpha,
+            stroke = args.stroke,
+            PC_axis1 = args.pc_axis_one,
+            PC_axis2 = args.pc_axis_two
+    )
 
     # Save the plot
     output_path = args.output
