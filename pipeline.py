@@ -603,10 +603,16 @@ class Sample_Count_Summary(luigi.Task):
         return Merge_Denoise()
 
     def output(self):
-        summary_file = os.path.join(self.out_dir, "sample_counts.tsv")
+        summary_file_tsv = os.path.join(self.out_dir, "sample_counts.tsv")
+        summary_file_json = os.path.join(self.out_dir, "sample_counts.json")
         log_file = os.path.join(self.out_dir, "log.txt")
 
-        return luigi.LocalTarget(summary_file)
+        output = {
+            "tsv": luigi.LocalTarget(summary_file_tsv),
+            "json": luigi.LocalTarget(summary_file_json)
+        }
+
+        return output
 
     def run(self):
         # Make output directory
@@ -615,7 +621,10 @@ class Sample_Count_Summary(luigi.Task):
                 self.out_dir],
                 self)
 
-        get_sample_count(self.input()['table'].path, self.output().path)
+        get_sample_count(
+                self.input()['table'].path,
+                self.output()["tsv"].path,
+                self.output()["json"].path)
 
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
