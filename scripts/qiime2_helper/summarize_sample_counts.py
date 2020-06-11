@@ -95,6 +95,28 @@ def write_output(sample_count_df, output_filepath, is_verbose=True):
             logger.error(err)
             raise
 
+def write_output_json(sample_count_df, output_filepath, is_verbose=True):
+    """
+    Write output
+    """
+    # Write output
+    if(output_filepath is None):
+        # Write to STDOUT
+        logger.info("Writing counts summary file to STDOUT")
+        sample_count_df.to_csv(sys.stdout, sep='\t', columns=['Count'])
+    else:
+        logger.info("Writing counts summary file to " + output_filepath)
+
+        try:
+            sample_count_df['Count'].to_json(output_filepath, orient='index')
+        except IOError as err:
+            msg = "I/O Error: Cannot open the file {f}".format(f=output_filepath)
+            logger.error(msg)
+            raise
+        except Exception as err:
+            logger.error(err)
+            raise
+
 def write_min_count(min_count_filepath, sample_count_df):
         logger.info("Writing min count to " + min_count_filepath)
 
@@ -109,6 +131,28 @@ def write_min_count(min_count_filepath, sample_count_df):
         except Exception as err:
             logger.error(err)
             raise
+
+def get_sample_count(feature_table_filepath, tsv_output_path, json_output_path):
+    """
+    Get sample count and save it to a file
+
+    Input:
+        - feature_table_filepath: path to feature table QIIME2 artifact.
+        - output_filepath: path to save output
+    """
+    logger.info("Running summarize_sample_counts.py")
+
+    # Load feature table as pandas dataframe
+    feature_table_df = load_qiime2_artifact(feature_table_filepath)
+
+    # Generate sample counts
+    sample_count_df = generate_sample_count(feature_table_df)
+
+    # Write output
+    write_output(sample_count_df, tsv_output_path)
+    write_output_json(sample_count_df, json_output_path)
+
+    logger.info("Done!")
 
 def main(args):
     # Set user variables
@@ -141,6 +185,7 @@ def main(args):
 
     # Write output
     write_output(sample_count_df, output_filepath)
+    write_output_json(sample_count_df, "test.json")
 
     # Get min count and write, if desired
     if min_count_filepath is not None:

@@ -173,18 +173,22 @@ def convert_col_dtype(df, col, dtype):
 
     return df
 
-def generate_pcoa_plot(pcoa,
-        metadata_df,
-        colouring_variable,
-        shape_variable=None,
-        primary_dtype="category",
-        secondary_dtype="category",
-        alpha=0.8,
-        stroke=0.6,
-        point_size=6,
-        PC_axis1='PC1',
-        PC_axis2='PC2'):
+def generate_pcoa_plot(
+    pcoa,
+    metadata,
+    colouring_variable,
+    shape_variable=None,
+    primary_dtype="category",
+    secondary_dtype="category",
+    alpha=0.8,
+    stroke=0.6,
+    point_size=6,
+    PC_axis1='PC1',
+    PC_axis2='PC2'):
 
+    # Load metadata file
+    metadata_df = load_metadata(metadata)
+    
     # Inner join metadata file with ordinations
     pcoa_coords = pcoa.samples
     pcoa_data_samples = pd.merge(
@@ -258,28 +262,35 @@ def generate_pcoa_plot(pcoa,
 
     return pcoa_plot
 
-def save_plot(pcoa_plot, output_pdf_filepath):
+def save_plot(pcoa_plot, filename, output_dir='.',
+    file_format='pdf', width=100, height=90, units='mm'):
+    
     # Save the plot
     # Add .pdf extension if not specified or other extensions are provided
-    if not (output_pdf_filepath.endswith('.pdf')):
-        file_name, file_ext = os.path.splitext(output_pdf_filepath)
+    #if not (filename.endswith('.pdf')):
+    #    file_name, file_ext = os.path.splitext(filename)
 
-        # Replace extension with .pdf if exists and not .pdf
-        if(file_ext and file_ext != '.pdf'):
-            output_pdf_filepath = file_name + '.pdf'
-        # Add .pdf if extension does not exist
-        else:
-            output_pdf_filepath = output_pdf_filepath + '.pdf'
+    #    # Replace extension with .pdf if exists and not .pdf
+    #    if(file_ext and file_ext != '.pdf'):
+    #        filename = file_name + '.pdf'
+    #    # Add .pdf if extension does not exist
+    #    else:
+    #        filename = filename + '.pdf'
+
+    # Add extension to file name
+    fname = filename + "." + file_format
 
     # Plot size
-    pdf_width_mm = 100
-    pdf_height_mm = 90
+    pdf_width_mm = width
+    pdf_height_mm = height
 
     pcoa_plot.save(
-             output_pdf_filepath,
+             filename=fname,
+             format=file_format,
+             path=output_dir,
              width=pdf_width_mm,
              height=pdf_height_mm,
-             units='mm')
+             units=units)
 
 if __name__ == "__main__":
     parser = args_parse()
@@ -303,7 +314,7 @@ if __name__ == "__main__":
     # Generate PCoA plot
     pcoa_plot = generate_pcoa_plot(
             pcoa = pcoa,
-            metadata_df = metadata_df,
+            metadata_df = args.metadata,
             colouring_variable = args.target_primary,
             shape_variable = args.target_secondary,
             point_size = args.point_size)
