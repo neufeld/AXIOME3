@@ -263,26 +263,30 @@ def generate_pcoa_plot(
     return pcoa_plot
 
 def save_plot(pcoa_plot, filename, output_dir='.',
-    width=100, height=90, units='mm'):
+    file_format='pdf', width=100, height=90, units='mm'):
     
     # Save the plot
     # Add .pdf extension if not specified or other extensions are provided
-    if not (filename.endswith('.pdf')):
-        file_name, file_ext = os.path.splitext(filename)
+    #if not (filename.endswith('.pdf')):
+    #    file_name, file_ext = os.path.splitext(filename)
 
-        # Replace extension with .pdf if exists and not .pdf
-        if(file_ext and file_ext != '.pdf'):
-            filename = file_name + '.pdf'
-        # Add .pdf if extension does not exist
-        else:
-            filename = filename + '.pdf'
+    #    # Replace extension with .pdf if exists and not .pdf
+    #    if(file_ext and file_ext != '.pdf'):
+    #        filename = file_name + '.pdf'
+    #    # Add .pdf if extension does not exist
+    #    else:
+    #        filename = filename + '.pdf'
+
+    # Add extension to file name
+    fname = filename + "." + file_format
 
     # Plot size
     pdf_width_mm = width
     pdf_height_mm = height
 
     pcoa_plot.save(
-             filename=filename,
+             filename=fname,
+             format=file_format,
              path=output_dir,
              width=pdf_width_mm,
              height=pdf_height_mm,

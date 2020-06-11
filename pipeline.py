@@ -1967,6 +1967,15 @@ class Get_Version_Info(luigi.Task):
             fh.write('Taxonomic Classifier path\n')
             fh.write(classifier_path)
 
+# Dummy class to run Denoise tasks
+class Run_Denoise_Tasks(luigi.Task):
+
+    def requires(self):
+        return [
+            Merge_Denoise(),
+            Sample_Count_Summary()
+        ]
+
 # Dummy Class to run multiple tasks
 class Core_Analysis(luigi.Task):
     out_dir = Output_Dirs().out_dir
