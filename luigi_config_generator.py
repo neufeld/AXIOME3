@@ -82,6 +82,17 @@ def args_parse():
             """,
             default=10000)
 
+    parser.add_argument('--abundance-threshold', help="""
+            % abundance threshold to filter ASV table by (0 to 1). 0 means no
+            filtering done. [Default = 0.05]
+            """,
+            default=0.05)
+
+    parser.add_argument('--r2-threshold', help="""
+            (For triplot). Only display environmental metadata if R2 value is
+            greather than the threshold. [Default = 0.3]
+            """,
+            default=0.3)
 
     return parser
 
@@ -104,14 +115,16 @@ def get_luigi_config(template, args):
     """
 
     config_data = template.replace("<MANIFEST_PATH>", args.manifest, 1)\
-                            .replace("<SAMPLE_TYPE>", args.sample_type, 1)\
-                            .replace("<INPUT_FORMAT>", args.input_format, 1)\
-                            .replace("<TRIM_LEFT_F>", str(args.trim_left_f), 1)\
-                            .replace("<TRUNC_LEN_F>", str(args.trunc_len_f), 1)\
-                            .replace("<TRIM_LEFT_R>", str(args.trim_left_r), 1)\
-                            .replace("<TRUNC_LEN_R>", str(args.trunc_len_r), 1)\
-                            .replace("<CLASSIFIER_PATH>", args.classifier, 1)\
-                            .replace("<SAMPLING_DEPTH>", str(args.sampling_depth), 1)
+                    .replace("<SAMPLE_TYPE>", args.sample_type, 1)\
+                    .replace("<INPUT_FORMAT>", args.input_format, 1)\
+                    .replace("<TRIM_LEFT_F>", str(args.trim_left_f), 1)\
+                    .replace("<TRUNC_LEN_F>", str(args.trunc_len_f), 1)\
+                    .replace("<TRIM_LEFT_R>", str(args.trim_left_r), 1)\
+                    .replace("<TRUNC_LEN_R>", str(args.trunc_len_r), 1)\
+                    .replace("<CLASSIFIER_PATH>", args.classifier, 1)\
+                    .replace("<SAMPLING_DEPTH>", str(args.sampling_depth), 1)\
+                    .replace("<ABUNDANCE_THRESHOLD>", str(args.abundance_threshold))\
+                    .replace("<R2_THRESHOLD>", str(args.r2_threshold))
 
     # Check if metadata file is provided
     if(args.metadata):
