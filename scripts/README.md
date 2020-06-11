@@ -15,6 +15,10 @@ python generate_pcoa.py \
   --target-primary <COLUMN IN METADATA YOU WANT TO VISUALIZE. REQUIRED> \
   --target-secondary <ADDITIONA COLUMN TO BE VISUALIZED. OPTINAL> \
   --point-size <SCATTER PLOT DATA POINT SIZE. DEFAULT=6> \
+  --alpha <TRANSPARENCY SCALE FROM 0 TO 1 (O = FULLY TRANSPARENT). DEFAULT=0.9> \
+  --stroke <POINT BORDER THICKNESS (0 = NO BORDER). DEFAULT=0.6> \
+  --pc-axis-one <FIRST PC AXIS TO PLOT. DEFAULT=PC1> \
+  --pc-axis-two <SECOND PC AXIS TO PLOT. DEFAULT=PC2> \
   --output <PATH_TO_STORE_OUTPUT_AS. DEFAULT="./PCoA_plot.pdf"
  
 ---------------------------------------------------------------
@@ -25,6 +29,10 @@ python generate_pcoa.py \
   --target-primary Types \
   --target-secondary NTCGroup \
   --point-size 4 \
+  --alpha 0.9 \
+  --stroke 0.6 \
+  --pc-axis-one PC1 \
+  --pc-axis-two PC2 \
   --output myPlot.pdf
 ```
 
