@@ -105,7 +105,7 @@ def generate_images(pcoa_qza, metadata, output_dir, point_size=6, image_format='
         filename = column + "." + image_format
         plot = generate_pcoa_plot(
                     pcoa=pcoa,
-                    metadata_df=metadata_df,
+                    metadata=metadata,
                     colouring_variable=str(column),
                     shape_variable=None,
                     point_size=point_size
