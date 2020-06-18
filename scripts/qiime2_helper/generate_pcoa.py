@@ -234,8 +234,11 @@ def generate_pcoa_plot(
     # Make x and y axis labels
     proportions = pcoa.proportion_explained
 
-    x_explained = str(round(proportions[0] * 100, 1))
-    y_explained = str(round(proportions[1] * 100, 1))
+    x_explained_idx = int(PC_axis1.replace('PC', '')) - 1
+    y_explained_idx = int(PC_axis2.replace('PC', '')) - 1
+
+    x_explained = str(round(proportions[x_explained_idx] * 100, 1))
+    y_explained = str(round(proportions[y_explained_idx] * 100, 1))
 
     # Convert user specified columns to category
     # **BIG ASSUMPTION HERE**
