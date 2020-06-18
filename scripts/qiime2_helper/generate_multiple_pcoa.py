@@ -53,17 +53,19 @@ def args_parse():
 
     return parser
 
-def run_multiple(pcoa, metadata_df, point_size):
+def run_multiple(pcoa, metadata, point_size):
     """
     Save multiple PCoA plots in a single pdf file
     """
+    # Load metadata into pandas dataframe
+    metadata_df = load_metadata(metadata)
 
     cols = metadata_df.columns
 
     for column in cols:
         yield generate_pcoa_plot(
                 pcoa=pcoa,
-                metadata_df=metadata_df,
+                metadata=metadata,
                 colouring_variable=str(column),
                 shape_variable=None,
                 point_size=point_size)
@@ -81,13 +83,10 @@ def generate_pdf(pcoa_qza, metadata, file_name, output_dir, point_size=6):
     """
     pcoa = convert_qiime2_2_skbio(pcoa_qza)
 
-    # Load metadata into pandas dataframe
-    metadata_df = load_metadata(metadata)
-
     #generate_pcoa_plot(pcoa, metadata_df, args.target_primary)
     output_name = "PCoA_plots_all.pdf"
     save_as_pdf_pages(
-            run_multiple(pcoa, metadata_df, point_size),
+            run_multiple(pcoa, metadata, point_size),
             filename=file_name,
             path=output_dir)
 
