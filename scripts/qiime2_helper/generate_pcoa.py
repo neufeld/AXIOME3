@@ -176,6 +176,13 @@ def add_discrete_fill_colours(plot, n_colours, name):
 
     return(plot)
 
+# Add a custom colour scale onto a plotnine ggplot
+def add_fill_colours_from_users(plot, name, palette='Paired', brewer_type='qual'):
+    plot = plot + scale_fill_brewer(type=brewer_type, palette=palette, name=name)
+
+
+    return(plot)
+
 # Add a custom shape scale
 def add_discrete_shape(plot, n_shapes, name):
     # circle, square, triangle, diamond, reverse triangle, star, plus, x
@@ -205,6 +212,8 @@ def generate_pcoa_plot(
     shape_variable=None,
     primary_dtype="category",
     secondary_dtype="category",
+    palette='Paired',
+    brewer_type='qual',
     alpha=0.9,
     stroke=0.6,
     point_size=6,
@@ -276,7 +285,7 @@ def generate_pcoa_plot(
     # Custom colours
     color_len = len(pcoa_data_samples[colouring_variable].unique())
     color_name = str(colouring_variable)
-    pcoa_plot = add_discrete_fill_colours(pcoa_plot, color_len, color_name)
+    pcoa_plot = add_fill_colours_from_users(pcoa_plot, color_name, palette, brewer_type)
 
     # Custom shapes
     if(shape_variable is not None):
