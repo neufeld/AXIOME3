@@ -217,6 +217,10 @@ def generate_pcoa_plot(
     alpha=0.9,
     stroke=0.6,
     point_size=6,
+    x_axis_text_size=10,
+    y_axis_text_size=10,
+    legend_title_size=10,
+    legend_text_size=10,
     PC_axis1='PC1',
     PC_axis2='PC2'):
 
@@ -278,8 +282,11 @@ def generate_pcoa_plot(
     + theme(panel_grid=element_blank(), 
             line=element_line(colour='black'),
            panel_border=element_rect(colour='black'),
-           legend_title=element_text(size=10, face='bold'),
+           legend_title=element_text(size=legend_title_size, face='bold'),
            legend_key=element_blank(),
+           legend_text=element_text(size=legend_text_size),
+           axis_title_x=element_text(size=x_axis_text_size),
+           axis_title_y=element_text(size=y_axis_text_size),
            legend_key_height=5,
            text=element_text(family='Arial', colour='black'))
     + xlab(PC_axis1 + ' (' + x_explained + '%)')
