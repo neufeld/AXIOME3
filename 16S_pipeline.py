@@ -1133,6 +1133,54 @@ class Generate_Combined_Filtered_Feature_Table(luigi.Task):
         with self.output()["log"].open('w') as fh:
             fh.write(logged_pre_rarefied)
 
+class Filtered_Taxonomic_Classification(luigi.Task):
+    classifier = luigi.Parameter()
+    n_jobs = luigi.Parameter(default="10")
+
+    taxonomy_dir = Output_Dirs().taxonomy_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        classified_taxonomy = os.path.join(self.taxonomy_dir, "taxonomy.qza")
+        taxonomy_log = os.path.join(self.taxonomy_dir, "taxonomy_log.txt")
+
+        output = {
+                "taxonomy": luigi.LocalTarget(classified_taxonomy),
+                "log": luigi.LocalTarget(taxonomy_log, format=luigi.format.Nop)
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.taxonomy_dir],
+                self)
+
+        # Run qiime classifier
+        cmd = ["qiime",
+                "feature-classifier",
+                "classify-sklearn",
+                "--i-classifier",
+                self.classifier,
+                "--i-reads",
+                self.input()["rep_seqs"].path,
+                "--o-classification",
+                self.output()["taxonomy"].path,
+                "--p-n-jobs",
+                self.n_jobs,
+                "--verbose"]
+
+        output = run_cmd(cmd, self)
+
+        # Log result
+        with self.output()["log"].open('wb') as fh:
+            fh.write(output)
+
+
 # Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
