@@ -111,6 +111,7 @@ class Output_Dirs(luigi.Config):
 
     post_analysis_dir = os.path.join(out_dir, "post_analysis")
     filtered_dir = os.path.join(post_analysis_dir, "filtered")
+    filtered_taxonomy_dir = os.path.join(filtered_dir, "taxonomy")
     core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
     alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
@@ -786,9 +787,7 @@ class Convert_Biom_to_TSV(luigi.Task):
             self.output().path,
             sep="\t",
             index_label="SampleID"
-        )
-
-        
+        ) 
 
 class Generate_Combined_Feature_Table(luigi.Task):
     export_dir = Output_Dirs().export_dir
@@ -963,6 +962,124 @@ class Export_Taxa_Collapse(luigi.Task):
         exported_genus_collapsed_table = os.path.join(self.collapse_dir,
                 "genus_collapsed_table.tsv")
         exported_species_collapsed_table = os.path.join(self.collapse_dir,
+                "species_collapsed_table.tsv")
+
+        output = {
+            "domain": luigi.LocalTarget(exported_domain_collapsed_table),
+            "phylum": luigi.LocalTarget(exported_phylum_collapsed_table),
+            "class": luigi.LocalTarget(exported_class_collapsed_table),
+            "order": luigi.LocalTarget(exported_order_collapsed_table),
+            "family": luigi.LocalTarget(exported_family_collapsed_table),
+            "genus": luigi.LocalTarget(exported_genus_collapsed_table),
+            "species": luigi.LocalTarget(exported_species_collapsed_table)
+        }
+
+        return output
+
+    def run(self):
+        # Make output dir
+        run_cmd(["mkdir",
+                "-p",
+                self.collapse_dir],
+                self)
+
+        # Taxa collapse
+        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
+                "species"]
+
+        for taxa in taxa_keys:
+            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            collapsed_df = output["feature_table"]
+
+            collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
+                    index_label="SampleID")
+
+class Filtered_Taxa_Collapse(luigi.Task):
+    filtered_taxonomy_dir = Output_Dirs().filtered_taxonomy_dir
+
+    def requires(self):
+        return {"Filter_Feature_Table": Filter_Feature_Table(),
+                "Taxonomic_Classification": Taxonomic_Classification()
+                }
+
+    def output(self):
+        domain_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "domain_collapsed_table.qza")
+        phylum_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "phylum_collapsed_table.qza")
+        class_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "class_collapsed_table.qza")
+        order_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "order_collapsed_table.qza")
+        family_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "family_collapsed_table.qza")
+        genus_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "genus_collapsed_table.qza")
+        species_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "species_collapsed_table.qza")
+
+        output = {
+            "domain": luigi.LocalTarget(domain_collapsed_table),
+            "phylum": luigi.LocalTarget(phylum_collapsed_table),
+            "class": luigi.LocalTarget(class_collapsed_table),
+            "order": luigi.LocalTarget(order_collapsed_table),
+            "family": luigi.LocalTarget(family_collapsed_table),
+            "genus": luigi.LocalTarget(genus_collapsed_table),
+            "species": luigi.LocalTarget(species_collapsed_table)
+        }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_taxonomy_dir],
+                self)
+
+        # Taxa collapse
+        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
+                "species"]
+
+        # Taxa level; 1=domain, 7=species
+        level = 1
+        for taxa in taxa_keys:
+            cmd = ["qiime",
+                    "taxa",
+                    "collapse",
+                    "--i-table",
+                    self.input()["Filter_Feature_Table"].path,
+                    "--i-taxonomy",
+                    self.input()["Taxonomic_Classification"]["taxonomy"].path,
+                    "--p-level",
+                    str(level),
+                    "--o-collapsed-table",
+                    self.output()[taxa].path]
+
+            level = level + 1
+
+            run_cmd(cmd, self)
+
+class Export_Filtered_Taxa_Collapse(luigi.Task):
+    filtered_taxonomy_dir = Output_Dirs().filtered_taxonomy_dir
+
+    def requires(self):
+        return Filtered_Taxa_Collapse()
+
+    def output(self):
+        exported_domain_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "domain_collapsed_table.tsv")
+        exported_phylum_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "phylum_collapsed_table.tsv")
+        exported_class_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "class_collapsed_table.tsv")
+        exported_order_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "order_collapsed_table.tsv")
+        exported_family_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "family_collapsed_table.tsv")
+        exported_genus_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
+                "genus_collapsed_table.tsv")
+        exported_species_collapsed_table = os.path.join(self.filtered_taxonomy_dir,
                 "species_collapsed_table.tsv")
 
         output = {
