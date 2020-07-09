@@ -1333,7 +1333,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 'diversity',
                 'core-metrics-phylogenetic',
                 '--i-table',
-                self.input()['Filter_Feature_Table']['table'].path,
+                self.input()['Filter_Feature_Table'].path,
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-sampling-depth',
