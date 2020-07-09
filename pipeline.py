@@ -1245,7 +1245,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
 
     def requires(self):
         return {
-                'Merge_Denoise': Merge_Denoise(),
+                'Filter_Feature_Table': Filter_Feature_Table(),
                 'Phylogeny_Tree': Phylogeny_Tree()
                 }
 
@@ -1333,7 +1333,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 'diversity',
                 'core-metrics-phylogenetic',
                 '--i-table',
-                self.input()['Merge_Denoise']['table'].path,
+                self.input()['Filter_Feature_Table']['table'].path,
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-sampling-depth',
@@ -1406,7 +1406,7 @@ class Rarefy(luigi.Task):
 
         # If sampling depth is 0, automatically determine sampling depth
         if(self.sampling_depth == '0'):
-            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+            sampling_depth = auto_sampling_depth(self.input()['Merge_Denoise'].path)
         else:
             sampling_depth = self.sampling_depth
 
@@ -1877,7 +1877,7 @@ class Rarefaction_Curves(luigi.Task):
 
         # If sampling depth is 0, automatically determine sampling depth
         if(self.sampling_depth == '0'):
-            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+            sampling_depth = auto_sampling_depth(self.input()['Merge_Denoise'].path)
         else:
             sampling_depth = self.sampling_depth
 
