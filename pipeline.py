@@ -8,7 +8,11 @@ import pandas as pd
 from textwrap import dedent
 
 # Import custom modules
-from scripts.qiime2_helper.summarize_sample_counts import get_sample_count
+from scripts.qiime2_helper.summarize_sample_counts import (
+    load_qiime2_artifact,
+    generate_sample_count,
+    get_sample_count
+)
 from scripts.qiime2_helper.generate_combined_feature_table import combine_table
 from scripts.qiime2_helper import export_qiime_artifact
 from scripts.qiime2_helper.generate_multiple_pcoa import (
@@ -39,6 +43,15 @@ qiime2_helper_dir = os.path.join(script_dir, "qiime2_helper")
 
 # FAPROTAX directory with database file and script
 FAPROTAX = "FAPROTAX"
+
+def auto_sampling_depth(feature_table_artifact):
+    # Get the lowest sequence read in the samples
+    feature_table_df = load_qiime2_artifact(feature_table_artifact)
+    sample_count_df = generate_sample_count(feature_table_df)
+
+    min_count = sample_count_df['Count'].min() if (sample_count_df['Count'].min() > 0) else 1
+
+    return str(min_count)
 
 def run_cmd(cmd, step):
     #try:
@@ -1308,6 +1321,12 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 Output_Dirs().core_metric_dir],
                 self)
 
+        # If sampling depth is 0, automatically determine sampling depth
+        if(self.sampling_depth == '0'):
+            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+        else:
+            sampling_depth = self.sampling_depth
+
         # Run core-metric-phylogenetic
         cmd = [
                 'qiime',
@@ -1318,7 +1337,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-sampling-depth',
-                self.sampling_depth,
+                sampling_depth,
                 '--o-rarefied-table',
                 self.output()['rarefied_table'].path,
                 '--o-faith-pd-vector',
@@ -1385,6 +1404,12 @@ class Rarefy(luigi.Task):
                 self.rarefy_dir],
                 self)
 
+        # If sampling depth is 0, automatically determine sampling depth
+        if(self.sampling_depth == '0'):
+            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+        else:
+            sampling_depth = self.sampling_depth
+
         # Rarefy
         cmd = ["qiime",
                 "feature-table",
@@ -1392,7 +1417,7 @@ class Rarefy(luigi.Task):
                 "--i-table",
                 self.input()['table'].path,
                 "--p-sampling-depth",
-                self.sampling_depth,
+                sampling_depth,
                 "--o-rarefied-table",
                 self.output().path
                 ]
@@ -1828,7 +1853,7 @@ class Taxonomy_Tabulate(luigi.Task):
         run_cmd(cmd, step)
 
 class Rarefaction_Curves(luigi.Task):
-    max_depth = luigi.Parameter(default="10000")
+    sampling_depth = luigi.Parameter(default="10000")
     out_dir = Output_Dirs().visualization_dir
 
     def requires(self):
@@ -1850,6 +1875,12 @@ class Rarefaction_Curves(luigi.Task):
                 self.out_dir],
                 self)
 
+        # If sampling depth is 0, automatically determine sampling depth
+        if(self.sampling_depth == '0'):
+            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+        else:
+            sampling_depth = self.sampling_depth
+
         # Make alpha rarefaction curve
         cmd = [
                 'qiime',
@@ -1860,7 +1891,7 @@ class Rarefaction_Curves(luigi.Task):
                 '--i-phylogeny',
                 self.input()['Phylogeny_Tree']['rooted_tree'].path,
                 '--p-max-depth',
-                self.max_depth,
+                sampling_depth,
                 '--o-visualization',
                 self.output().path
                 ]
