@@ -5,6 +5,8 @@ from skbio.stats import ordination
 import sys
 import logging
 
+from scripts.qiime2_helper.q2_artifact_types import ARTIFACT_TYPES
+
 logger = logging.getLogger(__name__)
 
 def args_parse():
@@ -65,6 +67,17 @@ def convert(artifact_path):
     else:
         logger.warning("Could not convert specified QIIME2 artifact.")
         return {}
+
+def check_artifact_type(artifact_path, artifact_type):
+    q2_artifact = Artifact.load(artifact_path)
+
+    # Raise ValueError if not appropriate type
+    if(str(q2_artifact.type) != ARTIFACT_TYPES[artifact_type]):
+        msg = "Input QIIME2 Artifact is not of the type '{}'".format(ARTIFACT_TYPES[artifact_type])
+        raise ValueError(msg)
+
+    return q2_artifact
+
 
 if __name__ == '__main__':
     parser = args_parse()

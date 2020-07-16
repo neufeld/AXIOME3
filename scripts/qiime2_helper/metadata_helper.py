@@ -65,4 +65,4 @@ def check_column_exists(metadata_df, target_primary, target_secondary=None):
 				column=target_secondary
 			)
 
-		raise ValueError(msg)
+			raise ValueError(msg)
