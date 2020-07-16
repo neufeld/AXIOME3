@@ -14,7 +14,7 @@ from scripts.qiime2_helper.summarize_sample_counts import (
     get_sample_count
 )
 from scripts.qiime2_helper.generate_combined_feature_table import combine_table
-from scripts.qiime2_helper import export_qiime_artifact
+from scripts.qiime2_helper import artifact_helper
 from scripts.qiime2_helper.generate_multiple_pcoa import (
         generate_pdf,
         generate_images,
@@ -793,7 +793,7 @@ class Convert_Biom_to_TSV(luigi.Task):
                 step)
 
         # Convert to TSV
-        output = export_qiime_artifact.convert(self.input()["table"].path)
+        output = artifact_helper.convert(self.input()["table"].path)
         collapsed_df = output["feature_table"]
 
         collapsed_df.T.to_csv(
@@ -1001,7 +1001,7 @@ class Export_Taxa_Collapse(luigi.Task):
                 "species"]
 
         for taxa in taxa_keys:
-            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            output = artifact_helper.convert(self.input()[taxa].path)
             collapsed_df = output["feature_table"]
 
             collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
@@ -1119,7 +1119,7 @@ class Export_Filtered_Taxa_Collapse(luigi.Task):
                 "species"]
 
         for taxa in taxa_keys:
-            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            output = artifact_helper.convert(self.input()[taxa].path)
             collapsed_df = output["feature_table"]
 
             collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
@@ -1198,7 +1198,7 @@ class Export_Filtered_Table(luigi.Task):
                 self.filtered_dir],
                 self)
 
-        output = export_qiime_artifact.convert(self.input().path)
+        output = artifact_helper.convert(self.input().path)
         collapsed_df = output["feature_table"]
 
         collapsed_df.T.to_csv(self.output().path, sep="\t",
@@ -1703,7 +1703,7 @@ class Export_Picrust(luigi.Task):
 
     def run(self):
         export_script_path = os.path.join(qiime2_helper_dir,
-                "export_qiime_artifact.py")
+                "artifact_helper.py")
 
         pathway_command = ['python',
                     export_script_path,
