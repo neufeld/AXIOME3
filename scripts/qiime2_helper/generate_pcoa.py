@@ -3,7 +3,6 @@ Modified version of Jackson Tsuji of Neufeld Research Group's script to make PCo
 
 Written by Daniel Min, Neufeld Research Group, 2019
 """
-from argparse import ArgumentParser
 from skbio.stats import ordination
 from qiime2 import (
     Artifact,
@@ -14,6 +13,11 @@ import os
 import pandas as pd
 from plotnine import *
 
+from scripts.qiime2_helper.metadata_helper import (
+    load_metadata,
+    convert_col_dtype
+)
+
 # Colour formatters
 formatters = {
         'RED': '\033[91m',
@@ -22,73 +26,6 @@ formatters = {
         'UNDERLINE': '\033[4m',
         'END': '\033[0m'
         }
-
-def args_parse():
-    """
-    Parse command line arguments into Python
-    """
-    parser = ArgumentParser(description = "Script to generate manifest file for qiime2")
-
-    parser.add_argument('--pcoa-qza', help="""
-            QIIME2 PCoA artifact (.qza)
-            """,
-            required=True)
-
-    parser.add_argument('--metadata', help="""
-            Metadata file used for QIIME2. It will IGNORE commented lines.
-            Requires first column to be Sample ID column
-            """,
-            required=True)
-
-    parser.add_argument('--target-primary', help="""
-            Primary target column to use for PCoA plot. Uses colors as
-            levels.
-            """,
-            required=True)
-
-    parser.add_argument('--target-secondary', help="""
-            Second target column to use for PCoA plot. Uses shapes as levels
-            """,
-            default=None)
-
-    parser.add_argument('--point-size', help="""
-            Geom_point size. Default 6
-            """,
-            type=int,
-            default=6)
-
-    parser.add_argument('--alpha', help="""
-            Transparency scale from 0 to 1. 0 means fully transparent. Default
-            0.9.
-            """,
-            type=float,
-            default=0.9)
-
-    parser.add_argument('--stroke', help="""
-            Border thickness. 0 means no border. Default 0.6
-            """,
-            type=float,
-            default=0.6)
-
-    parser.add_argument('--pc-axis-one', help="""
-            First PC axis to plot. Default PC1
-            """,
-            type=str,
-            default="PC1")
-
-    parser.add_argument('--pc-axis-two', help="""
-            Second PC axis to plot. Default PC2
-            """,
-            type=str,
-            default="PC2")
-
-    parser.add_argument('--output', help="""
-            Path to store output as (extenstion should be .pdf)
-            """,
-            type=str,
-            default="PCoA_plot")
-
-    return parser
 
 def convert_qiime2_2_skbio(pcoa_artifact):
     """
@@ -109,8 +46,6 @@ def convert_qiime2_2_skbio(pcoa_artifact):
         pcoa = pcoa_artifact.view(ordination.OrdinationResults)
     except ValueError:
         raise
-    except Exception:
-        raise
 
     # Rename PCoA coordinates index (so left join can be performed later)
     coords = pcoa.samples
@@ -125,43 +60,6 @@ def convert_qiime2_2_skbio(pcoa_artifact):
     pcoa.samples = coords
 
     return pcoa
-
-def load_metadata(metadata_path):
-    # Use QIIME2 Metadata API to load metadata
-    metadata_obj = Metadata.load(metadata_path)
-    metadata_df = metadata_obj.to_dataframe()
-
-    # Rename index
-    metadata_df.index.names = ['SampleID']
-    # By default, pandas treats string as object
-    # Convert object dtype to category
-    cols = metadata_df.columns
-    object_type_cols = cols[metadata_df.dtypes == object]
-
-    for col in object_type_cols:
-        convert_col_dtype(metadata_df, col, "category")
-
-    return metadata_df
-
-def check_column_exists(metadata_df, target_primary, target_secondary=None):
-    """
-    Check if metadata has specified target columns
-    """
-    # Make sure user specified target columns actually exist in the dataframe
-    if(target_primary not in metadata_df.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=target_primary
-                )
-
-        raise ValueError(msg)
-
-    if(target_secondary is not None and
-        target_secondary not in metadata_df.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=target_secondary
-                )
-
-        raise ValueError(msg)
 
 # Add a custom colour scale onto a plotnine ggplot
 def add_discrete_fill_colours(plot, n_colours, name):
@@ -195,15 +93,6 @@ def add_discrete_shape(plot, n_shapes, name):
     plot = plot + scale_shape_manual(values=markers[0:n_shapes], name=name)
 
     return plot
-
-def convert_col_dtype(df, col, dtype):
-    """
-    Convert given column type to category
-    """
-    # Non-existent column exception should be caught by pandas library
-    df[col] = df[col].astype(dtype)
-
-    return df
 
 def generate_pcoa_plot(
     pcoa,
@@ -335,39 +224,3 @@ def save_plot(pcoa_plot, filename, output_dir='.',
              width=pdf_width_mm,
              height=pdf_height_mm,
              units=units)
-
-if __name__ == "__main__":
-    parser = args_parse()
-
-    # Print help messages if no arguments are supplied
-    if( len(sys.argv) < 2):
-        parser.print_help()
-        sys.exit(0)
-
-    args = parser.parse_args()
-
-    # Load QIIME2 PCoA result and convert to PCoA object
-    pcoa = convert_qiime2_2_skbio(args.pcoa_qza)
-
-    # Load metadata
-    metadata_df = load_metadata(args.metadata)
-
-    # Check if metadata has target columns
-    check_column_exists(metadata_df, args.target_primary, args.target_secondary)
-
-    # Generate PCoA plot
-    pcoa_plot = generate_pcoa_plot(
-            pcoa = pcoa,
-            metadata = args.metadata,
-            colouring_variable = args.target_primary,
-            shape_variable = args.target_secondary,
-            point_size = args.point_size,
-            alpha = args.alpha,
-            stroke = args.stroke,
-            PC_axis1 = args.pc_axis_one,
-            PC_axis2 = args.pc_axis_two
-    )
-
-    # Save the plot
-    output_path = args.output
-    save_plot(pcoa_plot, output_path)
