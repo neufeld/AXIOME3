@@ -364,7 +364,7 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1):
+	taxonomy_artifact_path, collapse_level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -376,7 +376,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Load feature table and collapse
 	feature_table_artifact = check_artifact_type(feature_table_artifact_path, "feature_table")
 	taxonomy_artifact = check_artifact_type(taxonomy_artifact_path, "taxonomy")
-	collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, level)
+	collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level)
 
 	original_taxa = pd.Series(collapsed_df["Taxon"])
 	row_id = pd.Series(collapsed_df.index)
@@ -445,12 +445,12 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
-	fillVariable, PC_axis_one='PC1', PC_axis_two='PC2'):
+	fill_variable, PC_axis_one='PC1', PC_axis_two='PC2'):
 	"""
 
 	"""
 	# Remove unused categories
-	merged_df[fillVariable] = merged_df[fillVariable].cat.remove_unused_categories()
+	merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
 	# Plot the data
 	base_plot = ggplot(
@@ -459,7 +459,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			x=PC_axis_one,
 			y=PC_axis_two,
 			label=merged_df.index,
-			fill=fillVariable
+			fill=fill_variable
 		)
 	)
 	base_points = geom_point(size=4)
@@ -551,12 +551,12 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 
 	return plot
 
-def save_plot(pcoa_plot, filename, output_dir='.',
+def save_plot(plot, filename, output_dir='.',
 		file_format='pdf', width=100, height=100, units='mm'):
 
 	fname = filename + "." + file_format
 
-	pcoa_plot.save(
+	plot.save(
 		filename=fname,
 		format=file_format,
 		path=output_dir,
@@ -565,19 +565,18 @@ def save_plot(pcoa_plot, filename, output_dir='.',
 		units=units
 	)
 
-feature_table_artifact_path = "/backend/triplot/merged_table.qza"
-taxonomy_artifact_path = "/backend/triplot/taxonomy.qza"
-sample_metadata_path = "/backend/triplot/modified_aq_survey_metadata_triplots.txt"
-env_metadata_path = "/backend/triplot/aq_survey_env_num.txt"
-merged_df, vector_arrow_df, wascores_df, proportion_explained = prep_triplot_input(
-	sample_metadata_path,
-	env_metadata_path,
-	feature_table_artifact_path,
-	taxonomy_artifact_path,
-	level="phylum",
-	abundance_threshold=0.2,
-	R2_threshold=0.05
-)
-triplot = make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained, fillVariable="I5_Index_ID")
-save_plot(triplot, "plot")
-#va = test(feature_table_artifact_path, taxonomy_artifact_path, sample_metadata_path, env_metadata_path)
+#feature_table_artifact_path = "/backend/triplot/merged_table.qza"
+#taxonomy_artifact_path = "/backend/triplot/taxonomy.qza"
+#sample_metadata_path = "/backend/triplot/modified_aq_survey_metadata_triplots.txt"
+#env_metadata_path = "/backend/triplot/aq_survey_env_num.txt"
+#merged_df, vector_arrow_df, wascores_df, proportion_explained = prep_triplot_input(
+#	sample_metadata_path,
+#	env_metadata_path,
+#	feature_table_artifact_path,
+#	taxonomy_artifact_path,
+#	collapse_level="phylum",
+#	abundance_threshold=0.2,
+#	R2_threshold=0.05
+#)
+#triplot = make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained, fill_variable="I5_Index_ID")
+#save_plot(triplot, "plot")
