@@ -844,6 +844,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
+    n_jobs = luigi.Parameter(default="10")
 
     def requires(self):
         return Merge_Denoise()
@@ -879,6 +880,8 @@ class Phylogeny_Tree(luigi.Task):
                 'align-to-tree-mafft-fasttree',
                 '--i-sequences',
                 self.input()['rep_seqs'].path,
+                '--p-n-threads',
+                self.n_jobs,
                 '--o-alignment',
                 self.output()['alignment'].path,
                 '--o-masked-alignment',
@@ -1008,7 +1011,6 @@ class Export_Taxa_Collapse(luigi.Task):
 
             collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
                     index_label="SampleID")
-
 
 # Post Analysis
 # Filter sample by metadata
@@ -1484,7 +1486,7 @@ class Convert_Rarefy_Biom_to_TSV(luigi.Task):
     rarefy_export_dir = Output_Dirs().rarefy_export_dir
 
     def requires(self):
-        return Filter_Feature_Table()
+        return Rarefy()
 
     def output(self):
         tsv = os.path.join(self.rarefy_export_dir, "feature-table.tsv")
