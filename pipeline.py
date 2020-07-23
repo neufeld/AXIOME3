@@ -842,6 +842,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
+    n_cores = luigi.Parameter(default="1")
 
     def requires(self):
         return Merge_Denoise()
@@ -877,6 +878,8 @@ class Phylogeny_Tree(luigi.Task):
                 'align-to-tree-mafft-fasttree',
                 '--i-sequences',
                 self.input()['rep_seqs'].path,
+                '--p-n-threads',
+                self.n_cores,
                 '--o-alignment',
                 self.output()['alignment'].path,
                 '--o-masked-alignment',
