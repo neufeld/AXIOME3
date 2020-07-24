@@ -14,6 +14,11 @@ import os
 import pandas as pd
 from plotnine import *
 
+from scripts.qiime2_helper.metadata_helper import (
+    load_metadata,
+    convert_col_dtype
+)
+
 # Colour formatters
 formatters = {
         'RED': '\033[91m',
@@ -109,8 +114,6 @@ def convert_qiime2_2_skbio(pcoa_artifact):
         pcoa = pcoa_artifact.view(ordination.OrdinationResults)
     except ValueError:
         raise
-    except Exception:
-        raise
 
     # Rename PCoA coordinates index (so left join can be performed later)
     coords = pcoa.samples
@@ -176,6 +179,13 @@ def add_discrete_fill_colours(plot, n_colours, name):
 
     return(plot)
 
+# Add a custom colour scale onto a plotnine ggplot
+def add_fill_colours_from_users(plot, name, palette='Paired', brewer_type='qual'):
+    plot = plot + scale_fill_brewer(type=brewer_type, palette=palette, name=name)
+
+
+    return(plot)
+
 # Add a custom shape scale
 def add_discrete_shape(plot, n_shapes, name):
     # circle, square, triangle, diamond, reverse triangle, star, plus, x
@@ -189,15 +199,6 @@ def add_discrete_shape(plot, n_shapes, name):
 
     return plot
 
-def convert_col_dtype(df, col, dtype):
-    """
-    Convert given column type to category
-    """
-    # Non-existent column exception should be caught by pandas library
-    df[col] = df[col].astype(dtype)
-
-    return df
-
 def generate_pcoa_plot(
     pcoa,
     metadata,
@@ -205,9 +206,15 @@ def generate_pcoa_plot(
     shape_variable=None,
     primary_dtype="category",
     secondary_dtype="category",
+    palette='Paired',
+    brewer_type='qual',
     alpha=0.9,
     stroke=0.6,
     point_size=6,
+    x_axis_text_size=10,
+    y_axis_text_size=10,
+    legend_title_size=10,
+    legend_text_size=10,
     PC_axis1='PC1',
     PC_axis2='PC2'):
 
@@ -225,8 +232,11 @@ def generate_pcoa_plot(
     # Make x and y axis labels
     proportions = pcoa.proportion_explained
 
-    x_explained = str(round(proportions[0] * 100, 1))
-    y_explained = str(round(proportions[1] * 100, 1))
+    x_explained_idx = int(PC_axis1.replace('PC', '')) - 1
+    y_explained_idx = int(PC_axis2.replace('PC', '')) - 1
+
+    x_explained = str(round(proportions[x_explained_idx] * 100, 1))
+    y_explained = str(round(proportions[y_explained_idx] * 100, 1))
 
     # Convert user specified columns to category
     # **BIG ASSUMPTION HERE**
@@ -266,8 +276,11 @@ def generate_pcoa_plot(
     + theme(panel_grid=element_blank(), 
             line=element_line(colour='black'),
            panel_border=element_rect(colour='black'),
-           legend_title=element_text(size=10, face='bold'),
+           legend_title=element_text(size=legend_title_size, face='bold'),
            legend_key=element_blank(),
+           legend_text=element_text(size=legend_text_size),
+           axis_title_x=element_text(size=x_axis_text_size),
+           axis_title_y=element_text(size=y_axis_text_size),
            legend_key_height=5,
            text=element_text(family='Arial', colour='black'))
     + xlab(PC_axis1 + ' (' + x_explained + '%)')
@@ -276,7 +289,7 @@ def generate_pcoa_plot(
     # Custom colours
     color_len = len(pcoa_data_samples[colouring_variable].unique())
     color_name = str(colouring_variable)
-    pcoa_plot = add_discrete_fill_colours(pcoa_plot, color_len, color_name)
+    pcoa_plot = add_fill_colours_from_users(pcoa_plot, color_name, palette, brewer_type)
 
     # Custom shapes
     if(shape_variable is not None):
