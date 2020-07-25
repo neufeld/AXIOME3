@@ -1354,7 +1354,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 self.output()['rarefied_table'].path,
                 '--o-faith-pd-vector',
                 self.output()['faith_pd_vector'].path,
-                '--o-observed-features-vector',
+                '--o-observed-otus-vector',
                 self.output()['obs_otu_vector'].path,
                 '--o-shannon-vector',
                 self.output()['shannon_vector'].path,
