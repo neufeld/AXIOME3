@@ -21,7 +21,7 @@ from scripts.qiime2_helper.generate_multiple_pcoa import (
         save_as_json
 )
 
-# Define custom logger
+# Define custom logger boys
 logger = logging.getLogger("luigi logger")
 
 ## Path to configuration file to be used
