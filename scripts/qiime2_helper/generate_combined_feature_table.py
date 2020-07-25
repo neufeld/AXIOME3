@@ -11,7 +11,7 @@ import logging
 import argparse
 import re
 
-from Bio.SeqIO.FastaIO import SimpleFastaParser
+from scripts.qiime2_helper.fasta_parser import get_id_and_seq
 import pandas as pd
 import qiime2
 
@@ -97,13 +97,12 @@ def add_rep_seqs_to_feature_table(feature_table, rep_seq_filepath):
     # Load the FastA file as a pandas dataframe
     # Based on https://stackoverflow.com/a/19452991 (accessed Sept. 12, 2019)
     logger.info('Loading representative sequences FastA file')
-    with open(rep_seq_filepath, 'r') as fasta_data:
-        fasta_ids = []
-        fasta_seqs = []
 
-        for id, seq in SimpleFastaParser(fasta_data):
-            fasta_ids.append(id)
-            fasta_seqs.append(seq)
+    fasta_ids = []
+    fasta_seqs = []
+    for _id, seq in get_id_and_seq(rep_seq_filepath):
+        fasta_ids.append(_id)
+        fasta_seqs.append(seq)
 
     rep_seq_dict = {'Feature ID': fasta_ids, 'ReprSequence': fasta_seqs}
     rep_seq_table = pd.DataFrame(rep_seq_dict)
@@ -200,6 +199,37 @@ def add_row_id(feature_table):
 
     return feature_table
 
+def combine_table(feature_table_filepath, rep_seq_filepath, taxonomy_filepath,
+        output_filepath):
+    """
+    Generates combined feature table.
+
+    Input:
+        - feature_table_filepath: feature table file (.tsv)
+        - rep_seq_filepath: representative sequence file (.fasta)
+        - taxonomy_filepath: taxonomy classification file (.tsv)
+        - output_filepath: Path to save output
+    """
+
+    feature_table = read_feature_table(feature_table_filepath)
+
+    # Add taxonomy information
+    feature_table = add_taxonomy_to_feature_table(
+            feature_table,
+            taxonomy_filepath
+    )
+    # Add row IDs as column in the beginning
+    feature_table = add_row_id(feature_table)
+
+    # Add representative sequences
+    feature_table = add_rep_seqs_to_feature_table(
+            feature_table,
+            rep_seq_filepath
+    )
+
+    # Save output
+    feature_table.to_csv(output_filepath, sep = '\t', index
+                                = False)
 
 def main(args):
     # Set user variables

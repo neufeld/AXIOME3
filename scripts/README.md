@@ -33,7 +33,7 @@ python generate_pcoa.py \
   --stroke 0.6 \
   --pc-axis-one PC1 \
   --pc-axis-two PC2 \
-  --output myPlot.pdf
+  --output myPlot
 ```
 
 If run successfully, it should create a PDF file with a PCoA plot in it.

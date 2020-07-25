@@ -1,5 +1,8 @@
 # Custom module
 # Slightly modified version of generate_pcoa.py
+from argparse import ArgumentParser
+import sys
+
 from scripts.qiime2_helper.generate_pcoa import (
     convert_qiime2_2_skbio,
     load_metadata,
@@ -53,17 +56,19 @@ def args_parse():
 
     return parser
 
-def run_multiple(pcoa, metadata_df, point_size):
+def run_multiple(pcoa, metadata, point_size):
     """
     Save multiple PCoA plots in a single pdf file
     """
+    # Load metadata into pandas dataframe
+    metadata_df = load_metadata(metadata)
 
     cols = metadata_df.columns
 
     for column in cols:
         yield generate_pcoa_plot(
                 pcoa=pcoa,
-                metadata_df=metadata_df,
+                metadata=metadata,
                 colouring_variable=str(column),
                 shape_variable=None,
                 point_size=point_size)
@@ -81,13 +86,10 @@ def generate_pdf(pcoa_qza, metadata, file_name, output_dir, point_size=6):
     """
     pcoa = convert_qiime2_2_skbio(pcoa_qza)
 
-    # Load metadata into pandas dataframe
-    metadata_df = load_metadata(metadata)
-
     #generate_pcoa_plot(pcoa, metadata_df, args.target_primary)
     output_name = "PCoA_plots_all.pdf"
     save_as_pdf_pages(
-            run_multiple(pcoa, metadata_df, point_size),
+            run_multiple(pcoa, metadata, point_size),
             filename=file_name,
             path=output_dir)
 
@@ -106,7 +108,7 @@ def generate_images(pcoa_qza, metadata, output_dir, point_size=6, image_format='
         filename = column + "." + image_format
         plot = generate_pcoa_plot(
                     pcoa=pcoa,
-                    metadata_df=metadata_df,
+                    metadata=metadata,
                     colouring_variable=str(column),
                     shape_variable=None,
                     point_size=point_size
@@ -150,6 +152,6 @@ if __name__ == "__main__":
     #generate_pcoa_plot(pcoa, metadata_df, args.target_primary)
     output_name = "PCoA_plots_all.pdf"
     save_as_pdf_pages(
-            run_multiple(pcoa, metadata_df, args.point_size),
+            run_multiple(pcoa, args.metadata, args.point_size),
             filename=args.file_name,
             path=args.output_dir)
