@@ -7,6 +7,19 @@ import logging
 
 from scripts.qiime2_helper.q2_artifact_types import ARTIFACT_TYPES
 
+# Define constants
+# Taxa collapse valid levels
+VALID_LEVELS = {
+    "domain": 1, 
+    "phylum": 2,
+    "class": 3,
+    "order": 4, 
+    "family": 5, 
+    "genus": 6, 
+    "species": 7,
+    "asv": 8
+}
+
 logger = logging.getLogger(__name__)
 
 def args_parse():
