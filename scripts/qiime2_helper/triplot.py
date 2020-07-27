@@ -23,11 +23,12 @@ from scripts.qiime2_helper.metadata_helper import (
 )
 
 from scripts.qiime2_helper.artifact_helper import (
-	VALID_LEVELS,
+	VALID_COLLAPSE_LEVELS,
 	check_artifact_type
 )
 
 from scripts.qiime2_helper.rpy2_helper import (
+	VEGDIST_OPTIONS,
 	convert_pd_df_to_r,
 	convert_r_matrix_to_r_df,
 	convert_r_df_to_pd_df
@@ -49,7 +50,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	"""
 	collapse_level = collapse_level.lower()
 
-	if(collapse_level not in VALID_LEVELS):
+	if(collapse_level not in VALID_COLLAPSE_LEVELS):
 		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
 
 	# handle ASV case
@@ -71,7 +72,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 		return final_df
 
-	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_LEVELS[collapse_level])
+	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_COLLAPSE_LEVELS[collapse_level])
 
 	# By default, it has samples as rows, and taxa as columns
 	collapsed_df = table_artifact.collapsed_table.view(pd.DataFrame)
@@ -239,7 +240,7 @@ def find_sample_intersection(feature_table_df, sample_metadata_df, environmental
 
 	return intersection_feature_table_df, intersection_sample_metadata_df, intersection_environmental_metadata_df
 
-def calculate_dissimilarity_matrix(feature_table, method="bray"):
+def calculate_dissimilarity_matrix(feature_table, method="Bray-Curtis"):
 	"""
 	Calculates dissimilarity matarix using the feature table.
 	It uses R's vegan package (using rpy2 interface)
@@ -253,7 +254,10 @@ def calculate_dissimilarity_matrix(feature_table, method="bray"):
 	"""
 	vegan = importr('vegan')
 
-	return vegan.vegdist(feature_table, method)
+	if (method not in VEGDIST_OPTIONS):
+		raise AXIOME3Error("Specified dissmilarity method, {method} is not supported!".format(method=method))
+
+	return vegan.vegdist(feature_table, VEGDIST_OPTIONS[method])
 
 def calculate_ordination(dissimilarity_matrix):
 	"""
@@ -399,8 +403,8 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, collapse_level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1,
-	PC_axis_one=1, PC_axis_two=2):
+	taxonomy_artifact_path, collapse_level="asv", dissmilarity_index="Bray-Curtis",abundance_threshold=0.1,
+	R2_threshold=0.1, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -444,7 +448,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 
 	r_feature_table = convert_pd_df_to_r(intersection_feature_table_df)
 
-	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table)
+	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table, method=dissmilarity_index)
 
 	ordination = calculate_ordination(r_dissimilarity_matrix)
 

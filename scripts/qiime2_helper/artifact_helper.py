@@ -11,7 +11,7 @@ from scripts.qiime2_helper.q2_artifact_types import ARTIFACT_TYPES
 
 # Define constants
 # Taxa collapse valid levels
-VALID_LEVELS = {
+VALID_COLLAPSE_LEVELS = {
     "domain": 1, 
     "phylum": 2,
     "class": 3,
