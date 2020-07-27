@@ -33,6 +33,9 @@ from scripts.qiime2_helper.rpy2_helper import (
 	convert_r_df_to_pd_df
 )
 
+# Custom exception
+from exceptions.exception import AXIOME3Error
+
 def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv"):
 	"""
 	Collapse feature table to user specified taxa level (ASV by default).
@@ -47,7 +50,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	collapse_level = collapse_level.lower()
 
 	if(collapse_level not in VALID_LEVELS):
-		raise ValueError("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
+		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
 
 	# handle ASV case
 	if(collapse_level == "asv"):
@@ -157,7 +160,7 @@ def filter_by_abundance(df, abundance_threshold=0.1, percent_axis=0, filter_axis
 
 	# Raise error if no entries after filtering?
 	if(to_keep.any() == False):
-		raise ValueError("Zero entries after filtering by abundance at {} threshold".format(abundance_threshold))
+		raise AXIOME3Error("Zero entries after filtering by abundance at {} threshold".format(abundance_threshold))
 
 	# Note that original row index should preserved.
 	# Will be buggy if row index is reindexed. (add test case for this?)
@@ -228,7 +231,7 @@ def find_sample_intersection(feature_table_df, sample_metadata_df, environmental
 	intersection_samples = combined_df.index
 
 	if(len(intersection_samples) == 0):
-		raise ValueError("Feature table, sample metadata, and environmental metadata do NOT share any samples...")
+		raise AXIOME3Error("Feature table, sample metadata, and environmental metadata do NOT share any samples...")
 
 	intersection_feature_table_df = feature_table_df.loc[intersection_samples, ]
 	intersection_sample_metadata_df = sample_metadata_df.loc[intersection_samples, ]
@@ -370,7 +373,7 @@ def filter_by_wascore_threshold(normalized_wascores_df, wa_threshold):
 	Filter weighted average DataFrame by normalized abundance
 	"""
 	if('abundance' not in normalized_wascores_df.columns):
-		raise ValueError("normalized taxa count column does not exist")
+		raise AXIOME3Error("normalized taxa count column does not exist")
 
 	filtered_df = normalized_wascores_df[normalized_wascores_df['abundance'] > wa_threshold]
 
@@ -484,6 +487,10 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	"""
 
 	"""
+	# raise AXIOME3Error if PC_axis1 == PC_axis2
+	if(PC_axis_one == PC_axis_two):
+		raise AXIOME3Error("PC axis one and PC axis two cannot be equal!")
+
 	# Remove unused categories
 	merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 

@@ -3,6 +3,9 @@ from qiime2 import (
 	Metadata
 )
 
+# Custom exception
+from exceptions.exception import AXIOME3Error
+
 def load_metadata(metadata_path):
 	# Use QIIME2 Metadata API to load metadata
 	metadata_obj = Metadata.load(metadata_path)
@@ -32,7 +35,7 @@ def load_env_metadata(env_metadata_path):
 	numeric_env_df = env_metadata_df.select_dtypes(include='number')
 
 	if(len(numeric_env_df.columns) == 0):
-		raise ValueError("Environmental metadata must contain at least one numeric column!")
+		raise AXIOME3Error("Environmental metadata must contain at least one numeric column!")
 
 	return numeric_env_df
 
@@ -41,7 +44,7 @@ def convert_col_dtype(df, col, dtype):
 	Convert given column type to specified dtype
 	"""
 	if(col not in df.columns):
-		raise ValueError("Column, {}, does not exist in the dataframe".format(col))
+		raise AXIOME3Error("Column, {}, does not exist in the dataframe".format(col))
 
 	df[col] = df[col].astype(dtype)
 
@@ -57,7 +60,7 @@ def check_column_exists(metadata_df, target_primary, target_secondary=None):
 			column=target_primary
 		)
 
-		raise ValueError(msg)
+		raise AXIOME3Error(msg)
 
 	if(target_secondary is not None and
 		target_secondary not in metadata_df.columns):
@@ -65,4 +68,4 @@ def check_column_exists(metadata_df, target_primary, target_secondary=None):
 				column=target_secondary
 			)
 
-			raise ValueError(msg)
+			raise AXIOME3Error(msg)

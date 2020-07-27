@@ -5,6 +5,8 @@ from skbio.stats import ordination
 import sys
 import logging
 
+# Custom exception
+from exceptions.exception import AXIOME3Error
 from scripts.qiime2_helper.q2_artifact_types import ARTIFACT_TYPES
 
 # Define constants
@@ -87,7 +89,7 @@ def check_artifact_type(artifact_path, artifact_type):
     # Raise ValueError if not appropriate type
     if(str(q2_artifact.type) != ARTIFACT_TYPES[artifact_type]):
         msg = "Input QIIME2 Artifact is not of the type '{}'".format(ARTIFACT_TYPES[artifact_type])
-        raise ValueError(msg)
+        raise AXIOME3Error(msg)
 
     return q2_artifact
 
