@@ -23,6 +23,7 @@ from scripts.qiime2_helper.metadata_helper import (
 )
 
 from scripts.qiime2_helper.artifact_helper import (
+	VALID_LEVELS,
 	check_artifact_type
 )
 
@@ -44,17 +45,6 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 			(taxa/ASV as rows, samples as columns, numeric index, appends 'Taxon' column)
 	"""
 	collapse_level = collapse_level.lower()
-
-	VALID_LEVELS = {
-		"domain": 1, 
-		"phylum": 2,
-		"class": 3,
-		"order": 4, 
-		"familiy": 5, 
-		"genus": 6, 
-		"species": 7,
-		"asv": 8
-	}
 
 	if(collapse_level not in VALID_LEVELS):
 		raise ValueError("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
@@ -95,23 +85,55 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	return final_df
 
 def rename_taxa(taxa, row_id):
-	"""
-	Clean up SILVA taxonomic names
 
-	Input:
-	- taxa: list of SILVA taxa names (pd.Series)
-	- row_id: row ID (pd.Series)
-	"""
-	taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
+	def rename_taxa_silva132(taxa, row_id):
+		"""
+		Clean up SILVA132 taxonomic names
 
-	new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
-	new_taxa = [re.sub(r"(;\s*D_[2-6]__uncultured[^;_0-9]*)", "", t) for t in new_taxa]
-	new_taxa = [re.sub(r"\s*D_[0-6]__", "", t) for t in new_taxa]
+		Input:
+		- taxa: list of SILVA taxa names (pd.Series)
+		- row_id: row ID (pd.Series)
+		"""
+		taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
+		#taxa_with_id = taxa.astype(str)
 
-	# get the last entry
-	new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
+		new_taxa = [t.replace(';__', '') for t in taxa_with_id]
+		#new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
+		#new_taxa = [re.sub(r"(;\s*D_[2-6]__uncultured[^;_0-9]*)", "", t) for t in new_taxa]
+		new_taxa = [re.sub(r"\s*D_[0-6]__", "", t) for t in new_taxa]
 
-	return new_taxa
+		# get the last entry
+		new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
+
+		return new_taxa
+
+	def rename_taxa_silva138(taxa, row_id):
+		"""
+		Clean up SILVA138 taxonomic names
+
+		Input:
+		- taxa: list of SILVA taxa names (pd.Series)
+		- row_id: row ID (pd.Series)
+		"""
+		taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
+		#taxa_with_id = taxa.astype(str)
+
+		new_taxa = [t.replace(';__', '') for t in taxa_with_id]
+		#new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
+		#new_taxa = [re.sub(r"(;\s*[dpcofgs]__uncultured[^;dpcofgs]*)", "", t) for t in new_taxa]
+		new_taxa = [re.sub(r"\s*[dpcofgs]__", "", t) for t in new_taxa]
+
+		# get the last entry
+		new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
+
+		return new_taxa
+
+	# Determine whether given taxa name is SILVA132 or 138
+	# 132 format has D_[0-6] prefix
+	if(taxa.str.contains('D_[0-6]', regex=True).any()):
+		return rename_taxa_silva132(taxa, row_id)
+	else:
+		return rename_taxa_silva138(taxa, row_id)
 
 def filter_by_abundance(df, abundance_threshold=0.1, percent_axis=0, filter_axis=1):
 	"""
@@ -259,13 +281,15 @@ def calculate_weighted_average(ordination, feature_table):
 
 	return wascores
 
-def project_env_metadata_to_ordination(ordination, env_metadata):
+def project_env_metadata_to_ordination(ordination, env_metadata, PC_axis_one, PC_axis_two):
 	"""
 
 	"""
 	vegan = importr('vegan')
 
-	projection = vegan.envfit(ordination, env_metadata, choices=IntVector((1,2)))
+	pc_axes = (PC_axis_one, PC_axis_two)
+
+	projection = vegan.envfit(ordination, env_metadata, choices=IntVector(pc_axes))
 
 	return projection
 
@@ -304,10 +328,18 @@ def generate_vector_arrow_df(projection_df, R2_threshold):
 
 	return vector_arrow_df
 
-def rename_as_PC_columns(df):
+def rename_as_PC_columns(df, PC_axis_one=None, PC_axis_two=None):
 	"""
 	Rename pandas DataFrame column names as PC1, PC2, ...
 	"""
+	# Special case for environmental projection df
+	# It needs to be hardcoded because of the way df is created (refer to 'project_env_metadata_to_ordination()'')
+	if(PC_axis_one is not None and PC_axis_two is not None):
+		new_col_names = ['PC' + str(PC_axis_one), 'PC' + str(PC_axis_two)]
+		df.columns = new_col_names
+
+		return df
+
 	num_col = df.shape[1]
 	if(num_col == 0):
 		raise ValueError("Specified dataframe has zero columns...")
@@ -364,7 +396,8 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, collapse_level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1):
+	taxonomy_artifact_path, collapse_level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1,
+	PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -415,7 +448,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	wascores = calculate_weighted_average(ordination, r_feature_table)
 
 	r_env_metadata = convert_pd_df_to_r(intersection_environmental_metadata_df)
-	projection = project_env_metadata_to_ordination(ordination, r_env_metadata)
+	projection = project_env_metadata_to_ordination(ordination, r_env_metadata, PC_axis_one, PC_axis_two)
 
 	# convert to pandas DataFrame
 	ordination_point_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(ordination[ordination.names.index('points')]))
@@ -430,7 +463,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Rename dataframe columns
 	renamed_ordination_point_df = rename_as_PC_columns(ordination_point_df)
 	renamed_wascores_df = rename_as_PC_columns(wascores_df)
-	renamed_vector_arrow_df = rename_as_PC_columns(vector_arrow_df)
+	renamed_vector_arrow_df = rename_as_PC_columns(vector_arrow_df, PC_axis_one, PC_axis_two)
 
 	# Add normalized taxa count and filter by user specifed thresehold
 	normalized_wascores_df = normalized_taxa_total_abundance(renamed_wascores_df, intersection_feature_table_df)
@@ -445,31 +478,37 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
-	fill_variable, PC_axis_one='PC1', PC_axis_two='PC2'):
+	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
+	point_size=6, x_axis_text_size=10, y_axis_text_size=10, legend_title_size=10,
+	legend_text_size=10):
 	"""
 
 	"""
 	# Remove unused categories
 	merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
+	# PC axes to visualize
+	pc1 = 'PC'+str(PC_axis_one)
+	pc2 = 'PC'+str(PC_axis_two)
+
 	# Plot the data
 	base_plot = ggplot(
 		merged_df, 
 		aes(
-			x=PC_axis_one,
-			y=PC_axis_two,
+			x=pc1,
+			y=pc2,
 			label=merged_df.index,
 			fill=fill_variable
 		)
 	)
-	base_points = geom_point(size=4)
+	base_points = geom_point(size=point_size, alpha=alpha, stroke=stroke)
 
 	base_anno = geom_text(size=4)
 
-	PC_axis_one_variance = str(round(proportion_explained.loc[PC_axis_one, 'proportion_explained'],2))
-	PC_axis_two_variance = str(round(proportion_explained.loc[PC_axis_two, 'proportion_explained'],2))
-	x_label_placeholder = PC_axis_one + "(" + PC_axis_one_variance + "%)"
-	y_label_placeholder = PC_axis_two + "(" + PC_axis_two_variance + "%)"
+	PC_axis_one_variance = str(round(proportion_explained.loc[pc1, 'proportion_explained'],2))
+	PC_axis_two_variance = str(round(proportion_explained.loc[pc2, 'proportion_explained'],2))
+	x_label_placeholder = pc1 + "(" + PC_axis_one_variance + "%)"
+	y_label_placeholder = pc2 + "(" + PC_axis_two_variance + "%)"
 	x_lab = xlab(x_label_placeholder)
 	y_lab = ylab(y_label_placeholder)
 
@@ -477,6 +516,10 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		panel_grid=element_blank(), # No grid
 		panel_border=element_rect(colour='black'), # black outline
 		legend_key=element_blank(), # No legend background
+		axis_title_x=element_text(size=x_axis_text_size), # x axis label size
+		axis_title_y=element_text(size=y_axis_text_size), # y axis label size
+		legend_title=element_text(size=legend_title_size, face='bold'), # legend titel size
+		legend_text=element_text(size=legend_text_size), # legend text size
 		aspect_ratio=1
 	)
 
@@ -492,8 +535,8 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	if(wascores_df.shape[0] > 0):
 		taxa_points = geom_point(
 			aes(
-				x=PC_axis_one,
-				y=PC_axis_two,
+				x=pc1,
+				y=pc2,
 				size='abundance'
 			),
 			colour="black",
@@ -507,8 +550,8 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		# Taxa annotation
 		taxa_anno = geom_text(
 			aes(
-				x=PC_axis_one,
-				y=PC_axis_two,
+				x=pc1,
+				y=pc2,
 				label=wascores_df.index
 			),
 			data=wascores_df,
@@ -516,16 +559,22 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			size=4
 		)
 
-		plot = plot + taxa_points + scale_size_area(max_size=15) + taxa_anno
+		if(point_size <= 5):
+			taxa_max_size = point_size * 4
+		elif(point_size <= 10):
+			taxa_max_size = point_size * 3
+		else:
+			taxa_max_size = point_size * 1.5
+		plot = plot + taxa_points + scale_size_area(max_size=taxa_max_size) + taxa_anno
 
 	# if vector arrows pass the thresohld
 	if(vector_arrow_df.shape[0] > 0):
 		env_arrow = geom_segment(
 			aes(
 				x=0,
-				xend=PC_axis_one,
+				xend=pc1,
 				y=0,
-				yend=PC_axis_two,
+				yend=pc2,
 				colour=vector_arrow_df.index
 			),
 			data=vector_arrow_df,
@@ -536,8 +585,8 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 
 		env_anno = geom_text(
 			aes(
-				x=PC_axis_one,
-				y=PC_axis_two,
+				x=pc1,
+				y=pc2,
 				label=vector_arrow_df.index,
 				colour=vector_arrow_df.index
 			),
@@ -574,9 +623,23 @@ def save_plot(plot, filename, output_dir='.',
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
-#	collapse_level="phylum",
+#	collapse_level="order",
 #	abundance_threshold=0.2,
-#	R2_threshold=0.05
+#	R2_threshold=0.05,
+#	PC_axis_one=2,
+#	PC_axis_two=3
 #)
-#triplot = make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained, fill_variable="I5_Index_ID")
+#triplot = make_triplot(
+#	merged_df,
+#	vector_arrow_df,
+#	wascores_df,
+#	proportion_explained,
+#	fill_variable="I5_Index_ID",
+#	PC_axis_one=2,
+#	PC_axis_two=3
+#)
 #save_plot(triplot, "plot")
+
+
+#feature_table_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/dada2/merged/merged_table.qza"
+#taxonomy_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/taxonomy/taxonomy.qza"
