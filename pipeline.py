@@ -7,29 +7,33 @@ import logging
 import pandas as pd
 from textwrap import dedent
 
-# Custom Scripts
-from scripts.qiime2_helper import export_qiime_artifact
-from scripts.qiime2_helper.filter_by_abundance import (
-    filter_by_abundance,
-    clean_taxa
-)
+# Import custom modules
 from scripts.qiime2_helper.summarize_sample_counts import (
     load_qiime2_artifact,
-    generate_sample_count
+    generate_sample_count,
+    get_sample_count
+)
+from scripts.qiime2_helper.generate_combined_feature_table import combine_table
+from scripts.qiime2_helper import artifact_helper
+from scripts.qiime2_helper.generate_multiple_pcoa import (
+        generate_pdf,
+        generate_images,
+        save_as_json
 )
 
 # Define custom logger
-logger = logging.getLogger("16S-pipeline")
+logger = logging.getLogger("luigi logger")
+
+## Path to configuration file to be used
+#if("LUIGI_CONFIG_PATH" not in os.environ):
+#    raise FileNotFoundError("Add LUIGI_CONFIG_PATH to environment variable!")
+#
+#config_path = os.environ["LUIGI_CONFIG_PATH"]
+#luigi.configuration.add_config_path(config_path)
 
 # Path to configuration file to be used
-luigi.configuration.add_config_path("configuration/luigi.cfg")
-
-# Color formatter
-formatters = {
-        'RED': '\033[91m',
-        'GREEN': '\033[92m',
-        'END': '\033[0m'
-        }
+config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
+luigi.configuration.add_config_path(config_path)
 
 # Script directory
 script_dir = "scripts"
@@ -79,14 +83,13 @@ def run_cmd(cmd, step):
         combined_msg = (stdout + stderr).decode('utf-8')
         err_msg = "In {step}, the following command, : ".format(step=step) + \
                 "{cmd}\n\n".format(cmd=cmd) + \
-                "resulted in an error:\n{RED}{combined_msg}{END}"\
-                        .format(combined_msg=combined_msg,
-                                RED=formatters['RED'],
-                                END=formatters['END'])
+                "resulted in an error:\n{combined_msg}"\
+                        .format(combined_msg=combined_msg)
 
+        web_err_msg = "<-->" + combined_msg + "<-->"
 
         logger.error(err_msg)
-        raise ValueError(err_msg)
+        raise ValueError(web_err_msg)
     else:
         return stdout
 
@@ -112,16 +115,16 @@ class Output_Dirs(luigi.Config):
     out_dir = Out_Prefix().prefix
     manifest_dir = os.path.join(out_dir, "manifest")
     denoise_dir = os.path.join(out_dir, "dada2")
+    rarefy_dir = os.path.join(out_dir, "rarefy")
     taxonomy_dir = os.path.join(out_dir, "taxonomy")
     export_dir = os.path.join(out_dir, "exported")
+    rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
     phylogeny_dir = os.path.join(out_dir, "phylogeny")
     collapse_dir = os.path.join(out_dir, "taxa_collapse")
-    rarefy_dir = os.path.join(out_dir, "rarefy")
 
     post_analysis_dir = os.path.join(out_dir, "post_analysis")
     filtered_dir = os.path.join(post_analysis_dir, "filtered")
     filtered_taxonomy_dir = os.path.join(filtered_dir, "taxonomy")
-    rarefy_export_dir = os.path.join(post_analysis_dir, "rarefy_exported")
     core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
     alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
     pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
@@ -129,7 +132,6 @@ class Output_Dirs(luigi.Config):
     picrust_dir = os.path.join(post_analysis_dir, "PICRUST2")
 
     visualization_dir = os.path.join(out_dir, "visualization")
-    triplot_dir = os.path.join(out_dir, "triplot")
 
 class Samples(luigi.Config):
     """
@@ -140,12 +142,14 @@ class Samples(luigi.Config):
     """
     manifest_file = luigi.Parameter()
     metadata_file = luigi.Parameter(default='')
-    env_metadata_file = luigi.Parameter(default='')
     is_multiple = luigi.Parameter(default='n')
-    sampling_depth = luigi.Parameter(default='1000')
-    abundance_threshold = luigi.Parameter(default='0.05')
+    sampling_depth = luigi.Parameter(default='10000')
 
     def get_samples(self):
+        # If manifest file not specified by user, return
+        if(self.manifest_file == "<MANIFEST_PATH>"):
+            return
+
         manifest_df = pd.read_csv(self.manifest_file, index_col=0)
 
         # Return set of sample IDs if multiple IDs found
@@ -193,7 +197,7 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(qiime2_helper_dir,
+            split_script = os.path.join(script_dir,
                     "split_manifest_file_by_run_ID.py")
 
             cmd = ['python',
@@ -358,7 +362,7 @@ class Denoise(luigi.Task):
     trunc_len_f = luigi.Parameter(default="250")
     trim_left_r = luigi.Parameter(default="20")
     trunc_len_r = luigi.Parameter(default="250")
-    n_threads = luigi.Parameter(default="10")
+    n_cores = luigi.Parameter(default="1")
 
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
@@ -500,7 +504,7 @@ class Denoise(luigi.Task):
                         "--p-trunc-len-r",
                         self.trunc_len_r,
                         "--p-n-threads",
-                        self.n_threads,
+                        self.n_cores,
                         "--o-table",
                         self.output()[str(sample)]["table"].path,
                         "--o-representative-sequences",
@@ -530,7 +534,7 @@ class Denoise(luigi.Task):
                     "--p-trunc-len-r",
                     self.trunc_len_r,
                     "--p-n-threads",
-                    self.n_threads,
+                    self.n_cores,
                     "--o-table",
                     self.output()["table"].path,
                     "--o-representative-sequences",
@@ -613,9 +617,16 @@ class Sample_Count_Summary(luigi.Task):
         return Merge_Denoise()
 
     def output(self):
-        summary_file = os.path.join(self.out_dir, "sample_counts.tsv")
+        summary_file_tsv = os.path.join(self.out_dir, "sample_counts.tsv")
+        summary_file_json = os.path.join(self.out_dir, "sample_counts.json")
+        log_file = os.path.join(self.out_dir, "log.txt")
 
-        return luigi.LocalTarget(summary_file)
+        output = {
+            "tsv": luigi.LocalTarget(summary_file_tsv),
+            "json": luigi.LocalTarget(summary_file_json)
+        }
+
+        return output
 
     def run(self):
         # Make output directory
@@ -624,20 +635,14 @@ class Sample_Count_Summary(luigi.Task):
                 self.out_dir],
                 self)
 
-        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
-
-        cmd = ['python',
-                count_script,
-                '--input_filepath',
+        get_sample_count(
                 self.input()['table'].path,
-                '--output_filepath',
-                self.output().path]
-
-        run_cmd(cmd, self)
+                self.output()["tsv"].path,
+                self.output()["json"].path)
 
 class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
-    n_jobs = luigi.Parameter(default="10")
+    n_cores = luigi.Parameter(default="1")
 
     taxonomy_dir = Output_Dirs().taxonomy_dir
 
@@ -673,7 +678,7 @@ class Taxonomic_Classification(luigi.Task):
                 "--o-classification",
                 self.output()["taxonomy"].path,
                 "--p-n-jobs",
-                self.n_jobs,
+                self.n_cores,
                 "--verbose"]
 
         output = run_cmd(cmd, self)
@@ -769,29 +774,33 @@ class Export_Representative_Seqs(luigi.Task):
 
         run_cmd(cmd, self)
 
-class Convert_Biom_to_TSV(luigi.Task):
-    export_dir = Output_Dirs().export_dir
+class Convert_Feature_Table_to_TSV(luigi.Task):
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        tsv = os.path.join(self.export_dir, "feature-table.tsv")
+        tsv = os.path.join(Output_Dirs().export_dir, "feature-table.tsv")
 
         return luigi.LocalTarget(tsv)
 
     def run(self):
-        # Make output dir
+        step = str(self)
+        # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.export_dir],
-                self)
+                Output_Dirs().export_dir],
+                step)
 
-        output = export_qiime_artifact.convert(self.input()["table"].path)
+        # Convert to TSV
+        output = artifact_helper.convert(self.input()["table"].path)
         collapsed_df = output["feature_table"]
 
-        collapsed_df.T.to_csv(self.output().path, sep="\t",
-                index_label="SampleID")
+        collapsed_df.T.to_csv(
+            self.output().path,
+            sep="\t",
+            index_label="SampleID"
+        ) 
 
 class Generate_Combined_Feature_Table(luigi.Task):
     export_dir = Output_Dirs().export_dir
@@ -800,7 +809,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
         return {
                 "Export_Taxonomy": Export_Taxonomy(),
                 "Export_Representative_Seqs": Export_Representative_Seqs(),
-                "Convert_Biom_to_TSV": Convert_Biom_to_TSV(),
+                "Convert_Feature_Table_to_TSV": Convert_Feature_Table_to_TSV(),
                 }
 
     def output(self):
@@ -810,7 +819,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
         output = {
                 "table": luigi.LocalTarget(combined_table),
-                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                #"log": luigi.LocalTarget(log, format=luigi.format.Nop),
                 }
 
         return output
@@ -822,29 +831,18 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self.export_dir],
                 self)
 
-        # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
-                "generate_combined_feature_table.py")
-
-        cmd_pre_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Convert_Biom_to_TSV"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["table"].path]
-
-        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, self)
+        combine_table(self.input()["Convert_Feature_Table_to_TSV"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["table"].path)
 
         # Write log files
-        with self.output()["log"].open('w') as fh:
-            fh.write(logged_pre_rarefied)
+        #with self.output()["log"].open('w') as fh:
+        #    fh.write(logged_pre_rarefied)
 
 class Phylogeny_Tree(luigi.Task):
     phylogeny_dir = Output_Dirs().phylogeny_dir
-    n_jobs = luigi.Parameter(default="10")
+    n_cores = luigi.Parameter(default="1")
 
     def requires(self):
         return Merge_Denoise()
@@ -881,7 +879,7 @@ class Phylogeny_Tree(luigi.Task):
                 '--i-sequences',
                 self.input()['rep_seqs'].path,
                 '--p-n-threads',
-                self.n_jobs,
+                self.n_cores,
                 '--o-alignment',
                 self.output()['alignment'].path,
                 '--o-masked-alignment',
@@ -1006,148 +1004,11 @@ class Export_Taxa_Collapse(luigi.Task):
                 "species"]
 
         for taxa in taxa_keys:
-            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            output = artifact_helper.convert(self.input()[taxa].path)
             collapsed_df = output["feature_table"]
 
             collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
                     index_label="SampleID")
-
-# Post Analysis
-# Filter sample by metadata
-class Filter_Feature_Table(luigi.Task):
-    metadata_file = Samples().metadata_file
-    filtered_dir = Output_Dirs().filtered_dir
-
-    def requires(self):
-        return Merge_Denoise()
-
-    def output(self):
-        filtered_table = os.path.join(self.filtered_dir, "filtered_table.qza")
-
-        return luigi.LocalTarget(filtered_table)
-
-    def run(self):
-        # Make output direcotry
-        run_cmd(["mkdir",
-                "-p",
-                self.filtered_dir],
-                self)
-
-        # filter-sample command
-        cmd = ["qiime",
-                "feature-table",
-                "filter-samples",
-                "--i-table",
-                self.input()["table"].path,
-                "--m-metadata-file",
-                self.metadata_file,
-                "--o-filtered-table",
-                self.output().path]
-
-        run_cmd(cmd, self)
-
-class Summarize_Filtered_Table(luigi.Task):
-    filtered_dir = Output_Dirs().filtered_dir
-
-    def requires(self):
-        return Filter_Feature_Table()
-
-    def output(self):
-        summary_file = os.path.join(self.filtered_dir,
-                "filtered_table_summary.txt")
-
-        return luigi.LocalTarget(summary_file)
-
-    def run(self):
-        # Make output direcotry
-        run_cmd(["mkdir",
-                "-p",
-                self.filtered_dir],
-                self)
-
-        count_script = os.path.join(qiime2_helper_dir, "summarize_sample_counts.py")
-
-        cmd = ['python',
-                count_script,
-                '--input_filepath',
-                self.input().path,
-                '--output_filepath',
-                self.output().path]
-
-        run_cmd(cmd, self)
-
-class Export_Filtered_Table(luigi.Task):
-    filtered_dir = Output_Dirs().filtered_dir
-
-    def requires(self):
-        return Filter_Feature_Table()
-
-    def output(self):
-        biom = os.path.join(self.filtered_dir, "filtered_feature-table.tsv")
-
-        return luigi.LocalTarget(biom)
-
-    def run(self):
-        # Make output dir
-        run_cmd(["mkdir",
-                "-p",
-                self.filtered_dir],
-                self)
-
-        output = export_qiime_artifact.convert(self.input().path)
-        collapsed_df = output["feature_table"]
-
-        collapsed_df.T.to_csv(self.output().path, sep="\t",
-                index_label="SampleID")
-
-class Generate_Combined_Filtered_Feature_Table(luigi.Task):
-    filtered_dir = Output_Dirs().filtered_dir
-
-    def requires(self):
-        return {
-                "Export_Taxonomy": Export_Taxonomy(),
-                "Export_Representative_Seqs": Export_Representative_Seqs(),
-                "Export_Filtered_Table": Export_Filtered_Table(),
-                }
-
-    def output(self):
-        combined_table = os.path.join(self.filtered_dir, "filtered_ASV_table_combined.tsv")
-        log = os.path.join(self.filtered_dir, "ASV_table_combined.log")
-
-
-        output = {
-                "table": luigi.LocalTarget(combined_table),
-                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
-                }
-
-        return output
-
-    def run(self):
-        # Make output directory
-        run_cmd(["mkdir",
-                "-p",
-                self.filtered_dir],
-                self)
-
-        # Run Jackson's script on pre-rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
-                "generate_combined_feature_table.py")
-
-        cmd_pre_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Export_Filtered_Table"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["table"].path]
-
-        logged_pre_rarefied = run_cmd(cmd_pre_rarefied, self)
-
-        # Write log files
-        with self.output()["log"].open('w') as fh:
-            fh.write(logged_pre_rarefied)
 
 class Filtered_Taxa_Collapse(luigi.Task):
     filtered_taxonomy_dir = Output_Dirs().filtered_taxonomy_dir
@@ -1253,7 +1114,7 @@ class Export_Filtered_Taxa_Collapse(luigi.Task):
         # Make output dir
         run_cmd(["mkdir",
                 "-p",
-                self.filtered_taxonomy_dir],
+                self.collapse_dir],
                 self)
 
         # Taxa collapse
@@ -1261,11 +1122,133 @@ class Export_Filtered_Taxa_Collapse(luigi.Task):
                 "species"]
 
         for taxa in taxa_keys:
-            output = export_qiime_artifact.convert(self.input()[taxa].path)
+            output = artifact_helper.convert(self.input()[taxa].path)
             collapsed_df = output["feature_table"]
 
             collapsed_df.to_csv(self.output()[taxa].path, sep="\t",
                     index_label="SampleID")
+
+# Post Analysis
+# Filter sample by metadata
+class Filter_Feature_Table(luigi.Task):
+    metadata_file = Samples().metadata_file
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Merge_Denoise()
+
+    def output(self):
+        filtered_table = os.path.join(self.filtered_dir, "filtered_table.qza")
+
+        return luigi.LocalTarget(filtered_table)
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        # filter-sample command
+        cmd = ["qiime",
+                "feature-table",
+                "filter-samples",
+                "--i-table",
+                self.input()["table"].path,
+                "--m-metadata-file",
+                self.metadata_file,
+                "--o-filtered-table",
+                self.output().path]
+
+        run_cmd(cmd, self)
+
+class Summarize_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        summary_file_tsv = os.path.join(self.filtered_dir,
+                "filtered_table_summary.tsv")
+        summary_file_json = os.path.join(self.filtered_dir, "filtered_table_summary.json")
+
+        output = {
+            "tsv": luigi.LocalTarget(summary_file_tsv),
+            "json": luigi.LocalTarget(summary_file_json)
+        }
+
+        return output
+
+    def run(self):
+        # Make output direcotry
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        get_sample_count(
+                self.input().path,
+                self.output()["tsv"].path,
+                self.output()["json"].path)
+
+class Export_Filtered_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return Filter_Feature_Table()
+
+    def output(self):
+        biom = os.path.join(self.filtered_dir, "filtered_feature-table.tsv")
+
+        return luigi.LocalTarget(biom)
+
+    def run(self):
+        # Make output dir
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        output = artifact_helper.convert(self.input().path)
+        collapsed_df = output["feature_table"]
+
+        collapsed_df.T.to_csv(self.output().path, sep="\t",
+                index_label="SampleID")
+
+class Generate_Combined_Filtered_Feature_Table(luigi.Task):
+    filtered_dir = Output_Dirs().filtered_dir
+
+    def requires(self):
+        return {
+                "Export_Taxonomy": Export_Taxonomy(),
+                "Export_Representative_Seqs": Export_Representative_Seqs(),
+                "Export_Filtered_Table": Export_Filtered_Table(),
+                }
+
+    def output(self):
+        combined_table = os.path.join(self.filtered_dir, "filtered_ASV_table_combined.tsv")
+        log = os.path.join(self.filtered_dir, "ASV_table_combined.log")
+
+
+        output = {
+                "table": luigi.LocalTarget(combined_table),
+                "log": luigi.LocalTarget(log, format=luigi.format.Nop),
+                }
+
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.filtered_dir],
+                self)
+
+        combine_table(self.input()["Export_Filtered_Table"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["table"].path)
 
 # Most of these require rarefaction depth as a user parameter
 class Core_Metrics_Phylogeny(luigi.Task):
@@ -1337,7 +1320,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
     def run(self):
         # Make sure Metadata file is provided and exists
         if not(os.path.isfile(self.metadata_file)):
-            msg = dedent("""\
+            msg = dedent("""
                     Metadata file is not provided or the provided Metadata file
                     does not exist!
                     """)
@@ -1371,7 +1354,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 self.output()['rarefied_table'].path,
                 '--o-faith-pd-vector',
                 self.output()['faith_pd_vector'].path,
-                '--o-observed-otus-vector',
+                '--o-observed-features-vector',
                 self.output()['obs_otu_vector'].path,
                 '--o-shannon-vector',
                 self.output()['shannon_vector'].path,
@@ -1413,12 +1396,12 @@ class Core_Metrics_Phylogeny(luigi.Task):
         run_cmd(cmd, self)
 
 class Rarefy(luigi.Task):
-    sampling_depth = Samples().sampling_depth
+    sampling_depth = luigi.Parameter(default="10000")
 
     rarefy_dir = Output_Dirs().rarefy_dir
 
     def requires(self):
-        return Filter_Feature_Table()
+        return Merge_Denoise()
 
     def output(self):
         rarefied_table = os.path.join(Output_Dirs().rarefy_dir,
@@ -1435,17 +1418,16 @@ class Rarefy(luigi.Task):
 
         # If sampling depth is 0, automatically determine sampling depth
         if(self.sampling_depth == '0'):
-            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+            sampling_depth = auto_sampling_depth(self.input()['Merge_Denoise'].path)
         else:
             sampling_depth = self.sampling_depth
-
 
         # Rarefy
         cmd = ["qiime",
                 "feature-table",
                 "rarefy",
                 "--i-table",
-                self.input().path,
+                self.input()['table'].path,
                 "--p-sampling-depth",
                 sampling_depth,
                 "--o-rarefied-table",
@@ -1482,29 +1464,35 @@ class Export_Rarefy_Feature_Table(luigi.Task):
 
         run_cmd(cmd, step)
 
-class Convert_Rarefy_Biom_to_TSV(luigi.Task):
-    rarefy_export_dir = Output_Dirs().rarefy_export_dir
+class Convert_Rarefy_Table_to_TSV(luigi.Task):
 
     def requires(self):
         return Rarefy()
 
     def output(self):
-        tsv = os.path.join(self.rarefy_export_dir, "feature-table.tsv")
+        tsv = os.path.join(Output_Dirs().rarefy_export_dir, "rarefied_feature_table.tsv")
 
         return luigi.LocalTarget(tsv)
 
     def run(self):
-        # Make output dir
+        step = str(self)
+        # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.rarefy_export_dir],
-                self)
+                Output_Dirs().rarefy_export_dir],
+                step)
 
-        output = export_qiime_artifact.convert(self.input().path)
+        # Convert to TSV
+        output = artifact_helper.convert(self.input().path)
         collapsed_df = output["feature_table"]
 
-        collapsed_df.T.to_csv(self.output().path, sep="\t",
-                index_label="SampleID")
+        collapsed_df.T.to_csv(
+            self.output().path,
+            sep="\t",
+            index_label="SampleID"
+        )
+
+        run_cmd(cmd, step)
 
 class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
     rarefy_export_dir = Output_Dirs().rarefy_export_dir
@@ -1513,7 +1501,7 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
         return {
                 "Export_Taxonomy": Export_Taxonomy(),
                 "Export_Representative_Seqs": Export_Representative_Seqs(),
-                "Convert_Rarefy_Biom_to_TSV": Convert_Rarefy_Biom_to_TSV()
+                "Convert_Rarefy_Table_to_TSV": Convert_Rarefy_Table_to_TSV()
                 }
 
     def output(self):
@@ -1524,8 +1512,8 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
 
         output = {
                 "rarefied_table": luigi.LocalTarget(combined_rarefied_table),
-                "rarefied_log": luigi.LocalTarget(rarefied_log,
-                    format=luigi.format.Nop)
+                #"rarefied_log": luigi.LocalTarget(rarefied_log,
+                #    format=luigi.format.Nop)
                 }
 
         return output
@@ -1537,24 +1525,10 @@ class Generate_Combined_Rarefied_Feature_Table(luigi.Task):
                 self.rarefy_export_dir],
                 self)
 
-        # Run Jackson's script on rarefied table
-        combined_feature_table_script = os.path.join(qiime2_helper_dir,
-                "generate_combined_feature_table.py")
-
-        cmd_rarefied = [combined_feature_table_script,
-                "-f",
-                self.input()["Convert_Rarefy_Biom_to_TSV"].path,
-                "-s",
-                self.input()["Export_Representative_Seqs"].path,
-                "-t",
-                self.input()["Export_Taxonomy"].path,
-                "-o",
-                self.output()["rarefied_table"].path]
-
-        logged_rarefied = run_cmd(cmd_rarefied, self)
-
-        with self.output()["rarefied_log"].open('w') as fh:
-            fh.write(logged_rarefied)
+        combine_table(self.input()["Convert_Rarefy_Table_to_TSV"].path,
+                    self.input()["Export_Representative_Seqs"].path,
+                    self.input()["Export_Taxonomy"].path,
+                    self.output()["rarefied_table"].path)
 
 class Subset_ASV_By_Abundance(luigi.Task):
     """
@@ -1562,7 +1536,7 @@ class Subset_ASV_By_Abundance(luigi.Task):
     """
     export_dir = Output_Dirs().export_dir
     # Abundance threshold. Default is 1%
-    threshold = Samples().abundance_threshold
+    threshold = luigi.Parameter(default="0.01")
 
     def requires(self):
         return Generate_Combined_Feature_Table()
@@ -1742,7 +1716,7 @@ class Export_Picrust(luigi.Task):
 
     def run(self):
         export_script_path = os.path.join(qiime2_helper_dir,
-                "export_qiime_artifact.py")
+                "artifact_helper.py")
 
         pathway_command = ['python',
                     export_script_path,
@@ -1892,7 +1866,7 @@ class Taxonomy_Tabulate(luigi.Task):
         run_cmd(cmd, step)
 
 class Rarefaction_Curves(luigi.Task):
-    sampling_depth = Samples().sampling_depth
+    sampling_depth = luigi.Parameter(default="10000")
     out_dir = Output_Dirs().visualization_dir
 
     def requires(self):
@@ -1916,10 +1890,9 @@ class Rarefaction_Curves(luigi.Task):
 
         # If sampling depth is 0, automatically determine sampling depth
         if(self.sampling_depth == '0'):
-            sampling_depth = auto_sampling_depth(self.input()['Filter_Feature_Table'].path)
+            sampling_depth = auto_sampling_depth(self.input()['Merge_Denoise'].path)
         else:
             sampling_depth = self.sampling_depth
-
 
         # Make alpha rarefaction curve
         cmd = [
@@ -2050,151 +2023,90 @@ class PCoA_Plots(luigi.Task):
                 'jaccard_pcoa', 'bray_curtis_pcoa']
 
         # Make PCoA plots for each distance metric
-        pcoa_plot_script = os.path.join(qiime2_helper_dir, "generate_multiple_pcoa.py")
+        pcoa_plot_script = os.path.join(script_dir, "generate_multiple_pcoa.py")
         for metric in metrics:
             outdir = os.path.dirname(self.output()[metric].path)
             filename = os.path.basename(self.output()[metric].path)
 
-            cmd = ['python',
-                    pcoa_plot_script,
-                    '--pcoa-qza',
-                    self.input()[metric].path,
-                    '--metadata',
-                    self.metadata_file,
-                    '--file-name',
-                    filename,
-                    '--output-dir',
-                    outdir]
+            generate_pdf(self.input()[metric].path,
+                        self.metadata_file,
+                        filename,
+                        outdir)
 
-            run_cmd(cmd, self)
-
-class Prep_Triplot(luigi.Task):
-    triplot_dir = Output_Dirs().triplot_dir
-    threshold = Samples().abundance_threshold
-
-    def requires(self):
-        return Export_Filtered_Taxa_Collapse()
-
-    def output(self):
-        filtered_domain_table = os.path.join(self.triplot_dir,
-                "{threshold}_domain_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_phylum_table = os.path.join(self.triplot_dir,
-                "{threshold}_phylum_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_class_table = os.path.join(self.triplot_dir,
-                "{threshold}_class_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_order_table = os.path.join(self.triplot_dir,
-                "{threshold}_order_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_family_table = os.path.join(self.triplot_dir,
-                "{threshold}_family_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_genus_table = os.path.join(self.triplot_dir,
-                "{threshold}_genus_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-        filtered_species_table = os.path.join(self.triplot_dir,
-                "{threshold}_species_collapsed_table.tsv".format(
-                    threshold=str(self.threshold)))
-
-        output = {
-            "domain": luigi.LocalTarget(filtered_domain_table),
-            "phylum": luigi.LocalTarget(filtered_phylum_table),
-            "class": luigi.LocalTarget(filtered_class_table),
-            "order": luigi.LocalTarget(filtered_order_table),
-            "family": luigi.LocalTarget(filtered_family_table),
-            "genus": luigi.LocalTarget(filtered_genus_table),
-            "species": luigi.LocalTarget(filtered_species_table)
-        }
-
-        return output
-
-    def run(self):
-        # Make output directory
-        run_cmd(['mkdir',
-                '-p',
-                self.triplot_dir],
-                self)
-
-        # Taxa collapse
-        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
-                "species"]
-
-        for taxa in taxa_keys:
-            df = pd.read_csv(self.input()[taxa].path, sep='\t', index_col=0)
-            # Transpose df so that samples are in the columns
-            df_t = df.T
-
-            # Filter by abundance
-            filtered_df = filter_by_abundance(df_t, float(self.threshold))
-            # Re-transpose to make it compatible with the triplot script
-            final_df = filtered_df.T
-
-            # Clean up taxa names
-            taxa_names = final_df.columns.values
-            new_taxa_names = clean_taxa(taxa_names)
-            # Rename columns
-            final_df.columns = new_taxa_names
-
-            # Save output
-            final_df.to_csv(self.output()[taxa].path, sep="\t",
-                    index_label="SampleID")
-
-class Triplot(luigi.Task):
-    triplot_dir = Output_Dirs().triplot_dir
+class PCoA_Plots_jpeg(luigi.Task):
+    pcoa_dir = Output_Dirs().pcoa_dir
     metadata_file = Samples().metadata_file
-    env_metadata_file = Samples().env_metadata_file
-    r2_threshold = luigi.Parameter(default='0.1')
+
+    unweighted_unifrac_dir = os.path.join(pcoa_dir, "unweighted_unifrac")
+    weighted_unifrac_dir = os.path.join(pcoa_dir, "weighted_unifrac")
+    bray_curtis_dir = os.path.join(pcoa_dir, "bray_curtis")
+    jaccard_dir = os.path.join(pcoa_dir, "jaccard")
 
     def requires(self):
-        return Prep_Triplot()
+        return Core_Metrics_Phylogeny()
 
     def output(self):
-        domain_triplot = os.path.join(self.triplot_dir, "domain_triplot.pdf")
-        phylum_triplot = os.path.join(self.triplot_dir, "phylum_triplot.pdf")
-        class_triplot = os.path.join(self.triplot_dir, "class_triplot.pdf")
-        order_triplot = os.path.join(self.triplot_dir, "order_triplot.pdf")
-        family_triplot = os.path.join(self.triplot_dir, "family_triplot.pdf")
-        genus_triplot = os.path.join(self.triplot_dir, "genus_triplot.pdf")
-        species_triplot = os.path.join(self.triplot_dir, "species_triplot.pdf")
+        unweighted_unifrac_pcoa = os.path.join(self.unweighted_unifrac_dir,
+                "unweighted_unifrac_pcoa_plots.done")
+        weighted_unifrac_pcoa = os.path.join(self.weighted_unifrac_dir,
+                "weighted_unifrac_pcoa_plots.done")
+        bray_curtis_pcoa = os.path.join(self.bray_curtis_dir,
+                "bray_curtis_pcoa_plots.done")
+        jaccard_pcoa = os.path.join(self.jaccard_dir,
+                "jaccard_pcoa_plots.done")
+        json_summary = os.path.join(self.pcoa_dir,
+                "pcoa_columns.json")
 
         output = {
-            "domain": luigi.LocalTarget(domain_triplot),
-            "phylum": luigi.LocalTarget(phylum_triplot),
-            "class": luigi.LocalTarget(class_triplot),
-            "order": luigi.LocalTarget(order_triplot),
-            "family": luigi.LocalTarget(family_triplot),
-            "genus": luigi.LocalTarget(genus_triplot),
-            "species": luigi.LocalTarget(species_triplot)
-        }
+                'unweighted_unifrac_pcoa':
+                luigi.LocalTarget(unweighted_unifrac_pcoa),
+                'weighted_unifrac_pcoa':
+                luigi.LocalTarget(weighted_unifrac_pcoa),
+                'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
+                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa),
+                'json': luigi.LocalTarget(json_summary)
+                }
 
         return output
 
     def run(self):
+        # Make sure Metadata file is provided and exists
+        if not(os.path.isfile(self.metadata_file)):
+            msg = dedent("""
+                    Metadata file is not provided or the provided Metadata file
+                    does not exist!
+                    """)
+
+            raise FileNotFoundError(msg)
+
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                self.triplot_dir],
+                self.pcoa_dir],
                 self)
 
-        # Taxa collapse
-        taxa_keys = ["domain", "phylum", "class", "order", "family", "genus",
-                "species"]
+        # Input PCoA artifacts to loop through
+        # (It's identical to output keys!)
+        metrics = ['unweighted_unifrac_pcoa', 'weighted_unifrac_pcoa',
+                'jaccard_pcoa', 'bray_curtis_pcoa']
 
-        triplot_script = os.path.join(script_dir, "pcoa_triplot.R")
-        for taxa in taxa_keys:
-            # Run triplot R script
-            cmd = ['Rscript',
-                    triplot_script,
-                    self.input()[taxa].path,
+        # Make PCoA plots for each distance metric
+        for metric in metrics:
+            outdir = os.path.dirname(self.output()[metric].path)
+
+            # Make sub-output directory
+            run_cmd(['mkdir',
+                    '-p',
+                    outdir],
+                    self)
+
+            generate_images(
+                    self.input()[metric].path,
                     self.metadata_file,
-                    self.env_metadata_file,
-                    self.r2_threshold,
-                    self.output()[taxa].path
-            ]
+                    outdir
+            )
 
-            run_cmd(cmd, self)
+        save_as_json(self.metadata_file, self.output()['json'].path)
 
 # Get software version info
 class Get_Version_Info(luigi.Task):
@@ -2225,6 +2137,15 @@ class Get_Version_Info(luigi.Task):
             fh.write('Taxonomic Classifier path\n')
             fh.write(classifier_path)
 
+# Dummy class to run Denoise tasks
+class Run_Denoise_Tasks(luigi.Task):
+
+    def requires(self):
+        return [
+            Merge_Denoise(),
+            Sample_Count_Summary()
+        ]
+
 # Dummy Class to run multiple tasks
 class Core_Analysis(luigi.Task):
     out_dir = Output_Dirs().out_dir
@@ -2252,6 +2173,7 @@ class Core_Analysis(luigi.Task):
 class Post_Analysis(luigi.Task):
     def requires(self):
         return [
+                Core_Analysis(),
                 Summarize_Filtered_Table(),
                 Generate_Combined_Filtered_Feature_Table(),
                 Core_Metrics_Phylogeny(),
