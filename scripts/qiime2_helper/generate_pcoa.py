@@ -16,8 +16,11 @@ from plotnine import *
 
 from scripts.qiime2_helper.metadata_helper import (
     load_metadata,
-    convert_col_dtype
+    convert_col_dtype,
+    check_column_exists
 )
+
+from exceptions.exception import AXIOME3Error
 
 # Colour formatters
 formatters = {
@@ -63,29 +66,29 @@ def args_parse():
             default=6)
 
     parser.add_argument('--alpha', help="""
-            Transparency scale from 0 to 1. 0 means fully transparent. Default
-            0.9.
+            Transparency scale from 0 to 1. 0 means fully transparent. [Default
+            0.9]
             """,
             type=float,
             default=0.9)
 
     parser.add_argument('--stroke', help="""
-            Border thickness. 0 means no border. Default 0.6
+            Border thickness. 0 means no border. [Default 0.6]
             """,
             type=float,
             default=0.6)
 
     parser.add_argument('--pc-axis-one', help="""
-            First PC axis to plot. Default PC1
+            First PC axis to plot. Should be number. [Default 1]
             """,
-            type=str,
-            default="PC1")
+            type=int,
+            default=1)
 
     parser.add_argument('--pc-axis-two', help="""
-            Second PC axis to plot. Default PC2
+            Second PC axis to plot. Should be number. [Default 2]
             """,
-            type=str,
-            default="PC2")
+            type=int,
+            default=2)
 
     parser.add_argument('--output', help="""
             Path to store output as (extenstion should be .pdf)
@@ -109,10 +112,10 @@ def convert_qiime2_2_skbio(pcoa_artifact):
         # Check Artifact type
         if(str(pcoa_artifact.type) != "PCoAResults"):
             msg = "Input QIIME2 Artifact is not of the type 'PCoAResults'!"
-            raise ValueError(msg)
+            raise AXIOME3Error(msg)
 
         pcoa = pcoa_artifact.view(ordination.OrdinationResults)
-    except ValueError:
+    except AXIOME3Error:
         raise
 
     # Rename PCoA coordinates index (so left join can be performed later)
@@ -128,43 +131,6 @@ def convert_qiime2_2_skbio(pcoa_artifact):
     pcoa.samples = coords
 
     return pcoa
-
-def load_metadata(metadata_path):
-    # Use QIIME2 Metadata API to load metadata
-    metadata_obj = Metadata.load(metadata_path)
-    metadata_df = metadata_obj.to_dataframe()
-
-    # Rename index
-    metadata_df.index.names = ['SampleID']
-    # By default, pandas treats string as object
-    # Convert object dtype to category
-    cols = metadata_df.columns
-    object_type_cols = cols[metadata_df.dtypes == object]
-
-    for col in object_type_cols:
-        convert_col_dtype(metadata_df, col, "category")
-
-    return metadata_df
-
-def check_column_exists(metadata_df, target_primary, target_secondary=None):
-    """
-    Check if metadata has specified target columns
-    """
-    # Make sure user specified target columns actually exist in the dataframe
-    if(target_primary not in metadata_df.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=target_primary
-                )
-
-        raise ValueError(msg)
-
-    if(target_secondary is not None and
-        target_secondary not in metadata_df.columns):
-        msg = "Column '{column}' does NOT exist in the metadata!".format(
-                column=target_secondary
-                )
-
-        raise ValueError(msg)
 
 # Add a custom colour scale onto a plotnine ggplot
 def add_discrete_fill_colours(plot, n_colours, name):
@@ -215,8 +181,12 @@ def generate_pcoa_plot(
     y_axis_text_size=10,
     legend_title_size=10,
     legend_text_size=10,
-    PC_axis1='PC1',
-    PC_axis2='PC2'):
+    PC_axis1=1,
+    PC_axis2=2):
+
+    # raise AXIOME3Error if PC_axis1 == PC_axis2
+    if(PC_axis1 == PC_axis2):
+        raise AXIOME3Error("PC axis one and PC axis two cannot be equal!")
 
     # Load metadata file
     metadata_df = load_metadata(metadata)
@@ -232,8 +202,10 @@ def generate_pcoa_plot(
     # Make x and y axis labels
     proportions = pcoa.proportion_explained
 
-    x_explained_idx = int(PC_axis1.replace('PC', '')) - 1
-    y_explained_idx = int(PC_axis2.replace('PC', '')) - 1
+    x_explained_idx = PC_axis1 - 1
+    y_explained_idx = PC_axis2 - 1
+    pc_1 = 'PC' + str(PC_axis1)
+    pc_2 = 'PC' + str(PC_axis2)
 
     x_explained = str(round(proportions[x_explained_idx] * 100, 1))
     y_explained = str(round(proportions[y_explained_idx] * 100, 1))
@@ -259,14 +231,14 @@ def generate_pcoa_plot(
         secondary_target_fill = str(shape_variable)
 
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x=PC_axis1,
-                            y=PC_axis2,
+                        aes(x=pc_1,
+                            y=pc_2,
                             fill=primary_target_fill,
                             shape=secondary_target_fill))
     else:
         ggplot_obj = ggplot(pcoa_data_samples,
-                        aes(x=PC_axis1,
-                            y=PC_axis2,
+                        aes(x=pc_1,
+                            y=pc_2,
                             fill=primary_target_fill))
 
     # Plot the data
@@ -283,8 +255,8 @@ def generate_pcoa_plot(
            axis_title_y=element_text(size=y_axis_text_size),
            legend_key_height=5,
            text=element_text(family='Arial', colour='black'))
-    + xlab(PC_axis1 + ' (' + x_explained + '%)')
-    + ylab(PC_axis2 + ' (' + y_explained + '%)'))
+    + xlab(pc_1 + ' (' + x_explained + '%)')
+    + ylab(pc_2 + ' (' + y_explained + '%)'))
 
     # Custom colours
     color_len = len(pcoa_data_samples[colouring_variable].unique())
