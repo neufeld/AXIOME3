@@ -5,46 +5,28 @@ import pandas as pd
 import numpy as np
 import re
 from plotnine import *
+from rpy2.robjects.packages import importr
+from rpy2 import robjects as ro
 
-def import_taxonomy_artifact(artifact_path):
-	"""
-	Converts QIIME2 FeatureData[Taxonomy] to pd.DataFrame
+from scripts.qiime2_helper.metadata_helper import (
+	load_metadata
+)
 
-	Input:
-		- Path to QIIME2 artifact of type FeatureData[Taxonomy]
+from scripts.qiime2_helper.artifact_helper import (
+	VALID_COLLAPSE_LEVELS,
+	check_artifact_type,
+	calculate_percent_value,
+	rename_taxa
+)
 
-	Returns:
-		- QIIME2 Artifact object
-	"""
-	taxonomy_artifact = Artifact.load(artifact_path)
+from scripts.qiime2_helper.plotnine_helper import (
+	add_fill_colours_from_users,
+	add_fill_colours_continous,
+	add_fill_colours_discrete
+)
 
-	# Check artifact type
-	# Use hardcoded type comparison for now?
-	if(str(taxonomy_artifact.type) != "FeatureData[Taxonomy]"):
-		error_msg = "Input taxonomy file is not of type FeatureData[Taxonomy]!"
-		raise ValueError(error_msg)
-
-	return taxonomy_artifact
-
-def import_feature_table_artifact(artifact_path):
-	"""
-	Converts QIIME2 FeatureTable[Frequency] to pd.DataFrame
-
-	Input:
-		- Path to QIIME2 artifact of type FeatureTable[Frequency]
-
-	Returns:
-		- QIIME2 Artifact object
-	"""
-	feature_table_artifact = Artifact.load(artifact_path)
-
-	# Check artifact type
-	# Use hardcoded type comparison for now?
-	if(str(feature_table_artifact.type) != "FeatureTable[Frequency]"):
-		error_msg = "Input feature table file is not of type FeatureTable[Frequency]!"
-		raise ValueError(error_msg)	
-
-	return feature_table_artifact
+# Custom exception
+from exceptions.exception import AXIOME3Error
 
 def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv"):
 	"""
@@ -59,19 +41,8 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	"""
 	collapse_level = collapse_level.lower()
 
-	VALID_LEVELS = {
-		"domain": 1, 
-		"phylum": 2,
-		"class": 3,
-		"order": 4, 
-		"familiy": 5, 
-		"genus": 6, 
-		"species": 7,
-		"asv": 8
-	}
-
-	if(collapse_level not in VALID_LEVELS):
-		raise ValueError("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
+	if(collapse_level not in VALID_COLLAPSE_LEVELS):
+		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
 
 	# handle ASV case
 	if(collapse_level == "asv"):
@@ -92,7 +63,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 		return final_df
 
-	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_LEVELS[collapse_level])
+	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_COLLAPSE_LEVELS[collapse_level])
 
 	# By default, it has samples as rows, and taxa as columns
 	collapsed_df = table_artifact.collapsed_table.view(pd.DataFrame)
@@ -108,26 +79,6 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 	return final_df
 
-
-def rename_taxa(taxa, row_id):
-	"""
-	Clean up SILVA taxonomic names
-
-	Input:
-	- taxa: list of SILVA taxa names (pd.Series)
-	- row_id: row ID (pd.Series)
-	"""
-	taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
-
-	new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
-	new_taxa = [re.sub(r"(;\s*D_[2-6]__uncultured[^;_0-9]*)", "", t) for t in new_taxa]
-	new_taxa = [re.sub(r"\s*D_[0-6]__", "", t) for t in new_taxa]
-
-	# get the last entry
-	new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
-
-	return new_taxa
-
 def group_by_taxa(taxa, groupby="phylum", collapse_level="asv"):
 	"""
 	Extract taxa name from SILVA taxa format at the user specified level.
@@ -137,30 +88,20 @@ def group_by_taxa(taxa, groupby="phylum", collapse_level="asv"):
 	- groupby: taxa to group by
 	- collapse_level: taxa level to collapse feature table at
 	"""
-	VALID_LEVELS = {
-		"domain": 1, 
-		"phylum": 2,
-		"class": 3,
-		"order": 4, 
-		"familiy": 5, 
-		"genus": 6, 
-		"species": 7,
-		"asv": 8
-	}
 	groupby = groupby.lower()
 	collapse_level = collapse_level.lower()
 
 	# Taxa to group by should be more general than collapsed level
 	# e.g. groupby="asv", collapse_level="phylum" is not allowed
-	if(VALID_LEVELS[groupby] > VALID_LEVELS[collapse_level]):
-		raise ValueError("taxa to groupby must be more general than the taxa to collapse!\nspecified groupby:{groupby}\nspecified collapse level:{collapse_level}"
+	if(VALID_COLLAPSE_LEVELS[groupby] > VALID_COLLAPSE_LEVELS[collapse_level]):
+		raise AXIOME3Error("taxa to groupby must be more general than the taxa to collapse!\nspecified groupby:{groupby}\nspecified collapse level:{collapse_level}"
 			.format(
 				groupby=groupby,
 				collapse_level=collapse_level
 			)
 		)
 
-	def groupby_helper(taxa_name, groupby, VALID_LEVELS):
+	def groupby_helper(taxa_name, groupby):
 		"""
 		Expected input format: domain;phylum;class ... ;genus;species
 		Not all entries may exist
@@ -168,51 +109,18 @@ def group_by_taxa(taxa, groupby="phylum", collapse_level="asv"):
 		split = taxa_name.split(';')
 
 		# If entry does not exist, return it as unclassified
-		if(len(split) < VALID_LEVELS[groupby]):
+		if(len(split) < VALID_COLLAPSE_LEVELS[groupby]):
 			return "unclassified"
 
-		selected = split[VALID_LEVELS[groupby] - 1]
+		selected = split[VALID_COLLAPSE_LEVELS[groupby] - 1]
 
 		new_taxa = re.sub(r"\s*D_[0-6]__", "", selected)
 
 		return new_taxa
 
-	grouped_taxa = [groupby_helper(t, groupby, VALID_LEVELS) for t in taxa]
+	grouped_taxa = [groupby_helper(t, groupby) for t in taxa]
 
 	return grouped_taxa
-
-def calculate_percent_value(df, axis=0):
-	"""
-	Calculates % value per row or column. (value / (row) column sum).
-	Column by default
-
-	Input:
-		asv_df: pandas dataframe. Read from AXIOME3 ASV table (.tsv).
-			Should have ASV features as rows and Samples/metadata as
-			columns.
-			df: pandas dataframe.
-	"""
-
-	def percent_value_operation(x):
-		"""
-		Custom function to be applied on pandas dataframe.
-
-		Input:
-				x: pandas series; numerical data
-		"""
-		series_length = x.size
-		series_sum = x.sum()
-
-		# percent value should be zero if sum is 0
-		all_zeros = np.zeros(series_length)
-		percent_values = x / series_sum if series_sum != 0 else pd.Series(all_zeros)
-
-		return percent_values
-
-	# Calculate % value
-	percent_val_df = df.apply(lambda x: percent_value_operation(x), axis=axis)
-
-	return percent_val_df
 
 def filter_by_keyword(taxa, keyword=None):
 	"""
@@ -238,7 +146,7 @@ def filter_by_keyword(taxa, keyword=None):
 	if(match.any() == False):
 		message = "Specified search term, {term}, is NOT found in any entries".format(term=keyword)
 
-		raise ValueError(message)
+		raise AXIOME3Error(message)
 
 	return match
 
@@ -247,18 +155,18 @@ def filter_by_abundance(df, abundance_col, cutoff=0.2):
 	Filter dataframe by a specified column by abundance
 	"""
 	if(abundance_col not in df.columns):
-		raise ValueError("Column {col} does not exist in the dataframe".format(col=abundance_col))
+		raise AXIOME3Error("Column {col} does not exist in the dataframe".format(col=abundance_col))
 
 	filtered_df = df[df[abundance_col] >= cutoff]
 
 	if(filtered_df.shape[0] == 0):
-		raise ValueError("No entries left with {cutoff} abundance threshold".format(cutoff=cutoff))
+		raise AXIOME3Error("No entries left with {cutoff} abundance threshold".format(cutoff=cutoff))
 
 	return filtered_df
 
 def round_percentage(df, abundance_col, num_decimal=3):
 	if(abundance_col not in df.columns):
-		raise ValueError("Column {col} does not exist in the dataframe".format(col=abundance_col))
+		raise AXIOME3Error("Column {col} does not exist in the dataframe".format(col=abundance_col))
 
 	df[abundance_col] = df[abundance_col].round(num_decimal)
 
@@ -273,16 +181,16 @@ def alphabetical_sort_df(df, cols):
 	"""
 	for col in cols:
 		if(col not in df.columns):
-			raise ValueError("Column {col} does not exist in the dataframe".format(col=col))
+			raise AXIOME3Error("Column {col} does not exist in the dataframe".format(col=col))
 
 	sorted_df = df.sort_values(by=cols)
 
 	return sorted_df
 
 def prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path,
-	level="asv", groupby_taxa="phylum", keyword=None):
-	feature_table_artifact = import_feature_table_artifact(feature_table_artifact_path)
-	taxonomy_artifact = import_taxonomy_artifact(taxonomy_artifact_path)
+	metadata_path=None, level="asv", groupby_taxa="phylum", keyword=None):
+	feature_table_artifact = check_artifact_type(feature_table_artifact_path, "feature_table")
+	taxonomy_artifact = check_artifact_type(taxonomy_artifact_path, "taxonomy")
 	collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, level)
 
 	original_taxa = pd.Series(collapsed_df["Taxon"])
@@ -305,23 +213,32 @@ def prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path,
 	sorted_df = alphabetical_sort_df(rounded_abundance_filtered_df, ["TaxaGroup", "SpeciesName"])
 	# Make SpeciesName column category to avoid automatic sorting
 	sorted_df['SpeciesName'] = pd.Categorical(sorted_df['SpeciesName'], categories=sorted_df['SpeciesName'].unique(), ordered=True)
+	# Join metadata with bubbleplot df
+	if(metadata_path is not None):
+		metadata_df = load_metadata(metadata_path)
+		merged_df = sorted_df.merge(metadata_df, how="inner", left_on="SampleName", right_index=True)
+
+		return merged_df
 
 	return sorted_df
 
-def make_bubbleplot(df):
+def make_bubbleplot(df, fill_variable=None,
+	palette='Paired', brewer_type='qual', alpha=0.9, stroke=0.6):
+	aes_fill = fill_variable if fill_variable is not None else "SampleName"
 	ggplot_obj = ggplot(
 									df,
 									aes(
 										x="SampleName",
 										y="SpeciesName",
-										fill="SampleName",
+										fill=aes_fill,
 										size="Percentage"
 									)
 								)
 
-	point = geom_point(shape='o', alpha=0.9, show_legend=False)
+	point = geom_point(shape='o', alpha=alpha, stroke=stroke)
 	text = geom_text(aes(label="Percentage"), colour="black", size=5)
 	scale_size = scale_size_continuous(range=[6, 20])
+
 	y_label = ylab("Taxonomic affiliation")
 	main_theme = theme_bw()
 	theme_styles = theme(
@@ -337,16 +254,29 @@ def make_bubbleplot(df):
 									panel_spacing=0,
 									strip_background=element_blank()
 									)
-	#scale_fill_colour = scale_fill_brewer(type='qual',palette='Paired')
-	#colour_guide = guides(colour = guide_legend(keywidth=20, keyheight=20))
-	facet = facet_grid('TaxaGroup ~ .', scales="free_y", shrink=False)
+
+	size_guide = guides(size=False)
+	if(fill_variable is not None):
+		fill_guide = guides(fill=guide_legend(override_aes = {'size': 5}))
+	else:
+		fill_guide = guides(fill=False)
 	plot_theme = main_theme + theme_styles
 
-	bubble_plot = ggplot_obj + point + text + scale_size + y_label + theme_styles + facet
+	bubble_plot = ggplot_obj + point + text + scale_size + y_label + theme_styles + size_guide + fill_guide
+
+	# Add custom fill
+	if(fill_variable is not None):
+		if(pd.api.types.is_numeric_dtype(df[fill_variable])):
+			bubble_plot = add_fill_colours_continous(bubble_plot, str(fill_variable))
+		else:
+			if(len(df[fill_variable].unique()) > 12):
+				bubble_plot = add_fill_colours_discrete(bubble_plot, str(fill_variable))
+			else:
+				bubble_plot = add_fill_colours_from_users(bubble_plot, str(fill_variable), palette, brewer_type)
 
 	return bubble_plot
 
-def save_plot(plot, filename="plot.pdf", output_dir='.',
+def save_plot(plot, filename="plot", output_dir='.',
 	file_format='pdf', width=200, height=200, units='mm'):
 	# Add extension to file name
 	fname = filename + "." + file_format
@@ -362,6 +292,7 @@ def save_plot(plot, filename="plot.pdf", output_dir='.',
 
 #feature_table_artifact_path = "/data/output/dada2/dada2_table.qza"
 #taxonomy_artifact_path = "/data/output/taxonomy/taxonomy.qza"
-#df = prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path, "genus")
-#plot = bubbleplot(df)
+#metadata_path = "/data/metadata_MaCoTe.tsv"
+#df = prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path,metadata_path, "asv")
+#plot = make_bubbleplot(df, fill_variable="NTCGroup")
 #save_plot(plot)
