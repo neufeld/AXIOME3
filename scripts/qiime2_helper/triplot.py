@@ -1,7 +1,6 @@
 import os
-import re
-import numpy as np
 import pandas as pd
+import numpy as np
 from plotnine import *
 
 from qiime2 import (
@@ -23,11 +22,14 @@ from scripts.qiime2_helper.metadata_helper import (
 )
 
 from scripts.qiime2_helper.artifact_helper import (
-	VALID_LEVELS,
-	check_artifact_type
+	VALID_COLLAPSE_LEVELS,
+	check_artifact_type,
+	filter_by_abundance,
+	rename_taxa
 )
 
 from scripts.qiime2_helper.rpy2_helper import (
+	VEGDIST_OPTIONS,
 	convert_pd_df_to_r,
 	convert_r_matrix_to_r_df,
 	convert_r_df_to_pd_df
@@ -49,7 +51,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	"""
 	collapse_level = collapse_level.lower()
 
-	if(collapse_level not in VALID_LEVELS):
+	if(collapse_level not in VALID_COLLAPSE_LEVELS):
 		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
 
 	# handle ASV case
@@ -71,7 +73,7 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 		return final_df
 
-	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_LEVELS[collapse_level])
+	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_COLLAPSE_LEVELS[collapse_level])
 
 	# By default, it has samples as rows, and taxa as columns
 	collapsed_df = table_artifact.collapsed_table.view(pd.DataFrame)
@@ -86,114 +88,6 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 	final_df = collapsed_df_T.reset_index(drop=True)
 
 	return final_df
-
-def rename_taxa(taxa, row_id):
-
-	def rename_taxa_silva132(taxa, row_id):
-		"""
-		Clean up SILVA132 taxonomic names
-
-		Input:
-		- taxa: list of SILVA taxa names (pd.Series)
-		- row_id: row ID (pd.Series)
-		"""
-		taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
-		#taxa_with_id = taxa.astype(str)
-
-		new_taxa = [t.replace(';__', '') for t in taxa_with_id]
-		#new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
-		#new_taxa = [re.sub(r"(;\s*D_[2-6]__uncultured[^;_0-9]*)", "", t) for t in new_taxa]
-		new_taxa = [re.sub(r"\s*D_[0-6]__", "", t) for t in new_taxa]
-
-		# get the last entry
-		new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
-
-		return new_taxa
-
-	def rename_taxa_silva138(taxa, row_id):
-		"""
-		Clean up SILVA138 taxonomic names
-
-		Input:
-		- taxa: list of SILVA taxa names (pd.Series)
-		- row_id: row ID (pd.Series)
-		"""
-		taxa_with_id = taxa.astype(str) + "_" + row_id.astype(str)
-		#taxa_with_id = taxa.astype(str)
-
-		new_taxa = [t.replace(';__', '') for t in taxa_with_id]
-		#new_taxa = [re.sub(r";\s*Ambiguous_taxa", "", t) for t in taxa_with_id]
-		#new_taxa = [re.sub(r"(;\s*[dpcofgs]__uncultured[^;dpcofgs]*)", "", t) for t in new_taxa]
-		new_taxa = [re.sub(r"\s*[dpcofgs]__", "", t) for t in new_taxa]
-
-		# get the last entry
-		new_taxa = [re.sub(r".*;", "", t) for t in new_taxa]
-
-		return new_taxa
-
-	# Determine whether given taxa name is SILVA132 or 138
-	# 132 format has D_[0-6] prefix
-	if(taxa.str.contains('D_[0-6]', regex=True).any()):
-		return rename_taxa_silva132(taxa, row_id)
-	else:
-		return rename_taxa_silva138(taxa, row_id)
-
-def filter_by_abundance(df, abundance_threshold=0.1, percent_axis=0, filter_axis=1):
-	"""
-	Calculates taxa percent abundance per sample. (taxa abundance / overall abundance in a sample).
-
-	Input:
-		- df: pandas dataframe describing taxa/ASV abundance per sample.
-		- abundance_threshold: % value threshold (0: 0% cutoff, 1: 100% cutoff)
-		- percent_axis: axis used to calculate % abundance
-		- filter_axis: axis used to filter (filter if at least one of the samples has % abundance >= threshold)
-
-		If samples as columns, and taxa/ASV as rows, do percent_axis=0, filter_axis=1.
-		If samples as rows, and taxa/ASV as columns, do percent_axis=1, filter_axis=0.
-
-		Default options assume samples as columns and taxa/ASV as rows.
-	"""
-	percent_df = calculate_percent_value(df, percent_axis)
-
-	# keep taxa/ASVs if at least one of the samples has % abundance >= threshold
-	to_keep = (percent_df >= abundance_threshold).any(filter_axis)
-
-	# Raise error if no entries after filtering?
-	if(to_keep.any() == False):
-		raise AXIOME3Error("Zero entries after filtering by abundance at {} threshold".format(abundance_threshold))
-
-	# Note that original row index should preserved.
-	# Will be buggy if row index is reindexed. (add test case for this?)
-	filtered = df.loc[to_keep, ]
-
-	return filtered
-
-def calculate_percent_value(df, axis=0):
-	"""
-	(value / column (row) sum)
-	Column by default.
-	"""
-
-	def percent_value_operation(x):
-		"""
-		Custom function to be applied on pandas dataframe.
-
-		Input:
-				x: pandas series; numerical data
-		"""
-		series_length = x.size
-		series_sum = x.sum()
-
-		# percent value should be zero if sum is 0
-		all_zeros = np.zeros(series_length)
-		percent_values = x / series_sum if series_sum != 0 else pd.Series(all_zeros)
-
-		return percent_values
-
-	# Calculate % value
-	percent_val_df = df.apply(lambda x: percent_value_operation(x), axis=axis)
-
-	return percent_val_df
 
 def filter_by_total_count(feature_table_df, sum_axis=1):
 	"""
@@ -239,7 +133,7 @@ def find_sample_intersection(feature_table_df, sample_metadata_df, environmental
 
 	return intersection_feature_table_df, intersection_sample_metadata_df, intersection_environmental_metadata_df
 
-def calculate_dissimilarity_matrix(feature_table, method="bray"):
+def calculate_dissimilarity_matrix(feature_table, method="Bray-Curtis"):
 	"""
 	Calculates dissimilarity matarix using the feature table.
 	It uses R's vegan package (using rpy2 interface)
@@ -253,7 +147,10 @@ def calculate_dissimilarity_matrix(feature_table, method="bray"):
 	"""
 	vegan = importr('vegan')
 
-	return vegan.vegdist(feature_table, method)
+	if (method not in VEGDIST_OPTIONS):
+		raise AXIOME3Error("Specified dissmilarity method, {method} is not supported!".format(method=method))
+
+	return vegan.vegdist(feature_table, VEGDIST_OPTIONS[method])
 
 def calculate_ordination(dissimilarity_matrix):
 	"""
@@ -399,8 +296,8 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, collapse_level="asv", abundance_threshold=0.1, R2_threshold=0.1, wa_threshold=0.1,
-	PC_axis_one=1, PC_axis_two=2):
+	taxonomy_artifact_path, collapse_level="asv", dissmilarity_index="Bray-Curtis",abundance_threshold=0.1,
+	R2_threshold=0.1, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -444,7 +341,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 
 	r_feature_table = convert_pd_df_to_r(intersection_feature_table_df)
 
-	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table)
+	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table, method=dissmilarity_index)
 
 	ordination = calculate_ordination(r_dissimilarity_matrix)
 

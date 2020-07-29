@@ -3,6 +3,22 @@ import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 
+VEGDIST_OPTIONS = {
+	"Manhattan": "manhattan",
+	"Euclidean": "euclidean",
+	"Canberra": "canberra",
+	"Bray-Curtis": "bray",
+	"Kulczynski": "kulczynski",
+	"Jaccard": "jaccard",
+	"Gower": "gower",
+	"altGower": "altGower",
+	"Morisita": "morisita",
+	"Horn-Morisita": "horn",
+	"Chao": "chao",
+	"Cao": "cao",
+	"Mahalanobis":"mahalanobis"
+}
+
 def convert_pd_df_to_r(pd_df):
 	with localconverter(ro.default_converter + pandas2ri.converter):
 		r_df = ro.conversion.py2rpy(pd_df)
