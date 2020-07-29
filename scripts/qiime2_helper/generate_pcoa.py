@@ -19,6 +19,11 @@ from scripts.qiime2_helper.metadata_helper import (
     convert_col_dtype,
     check_column_exists
 )
+
+from scripts.qiime2_helper.plotnine_helper import (
+    add_fill_colours_from_users
+)
+
 # Custom exception
 from exceptions.exception import AXIOME3Error
 
@@ -142,21 +147,6 @@ def add_discrete_fill_colours(plot, n_colours, name):
         plot = plot + scale_fill_brewer(type='qual',palette='Paired',name=name)
     elif n_colours > 12:
         plot = plot
-
-    return(plot)
-
-# Add a custom colour scale onto a plotnine ggplot
-def add_fill_colours_from_users(plot, name, palette='Paired', brewer_type='qual'):
-    try:
-        custom_fill_brewer = scale_fill_brewer(type=brewer_type, palette=palette, name=name)
-    except KeyError:
-        raise AXIOME3Error(
-            "Specified palette, '{palette}', and/or brewer type, '{brewer}', is not supported!".format(
-                palette=palette,
-                brewer=brewer_type
-            )
-        )
-    plot = plot + custom_fill_brewer
 
     return(plot)
 
