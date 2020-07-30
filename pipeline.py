@@ -20,6 +20,9 @@ from scripts.qiime2_helper.generate_multiple_pcoa import (
         generate_images,
         save_as_json
 )
+from scripts.qiime2_helper.split_manifest_file_by_run_ID import (
+    split_manifest
+)
 
 # Define custom logger
 logger = logging.getLogger("luigi logger")
@@ -197,21 +200,13 @@ class Split_Samples(luigi.Task):
         is_multiple = str2bool(Samples().is_multiple)
 
         if(is_multiple):
-            split_script = os.path.join(script_dir,
-                    "split_manifest_file_by_run_ID.py")
-
-            cmd = ['python',
-                    split_script,
-                    '--input_filepath',
-                    manifest_path,
-                    '--output_dir',
-                    self.out_dir]
+            split_manifest(manifest_path, self.out_dir)
         else:
             cmd = ['cp',
                     manifest_path,
                     self.output().path]
 
-        run_cmd(cmd, self)
+            run_cmd(cmd, self)
 
 class Import_Data(luigi.Task):
     # Options for qiime tools import
