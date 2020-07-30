@@ -12,6 +12,9 @@ import argparse
 
 import pandas as pd
 
+# Custom exception
+from exceptions.exception import AXIOME3Error
+
 # GLOBAL VARIABLES
 SCRIPT_VERSION = '0.8.0'
 
@@ -19,6 +22,27 @@ SCRIPT_VERSION = '0.8.0'
 logging.basicConfig(level=logging.INFO, format="[ %(asctime)s UTC ]: %(levelname)s: %(module)s: %(message)s")
 logging.Formatter.converter = time.gmtime
 logger = logging.getLogger(__name__)
+
+def split_manifest(manifest_path, output_dir):
+    manifest_df = pd.read_csv(manifest_path)
+
+    if ('run_ID' not in manifest_df.columns):
+        raise AXIOME3Error("'run_ID' column must exist in the manifes file!")
+
+    # Get unique run IDs
+    unique_run_IDs = manifest_df['run_ID'].unique()
+
+    # Split table and write
+    for run_ID in unique_run_IDs:
+        output_filename = "manifest_" + str(run_ID) + ".csv"
+        output_filepath = os.path.join(output_dir, output_filename)
+        
+        single_run_table = manifest_df[manifest_df['run_ID'] == run_ID]
+        # Drop run_ID column
+        single_run_table = single_run_table.drop(['run_ID'], axis=1)
+        if(single_run_table.shape[0] != 0):
+            pd.DataFrame.to_csv(single_run_table, output_filepath, index = False)
+
 
 def main(args):
     # Set user variables
