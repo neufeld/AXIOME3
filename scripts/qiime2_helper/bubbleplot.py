@@ -5,8 +5,6 @@ import pandas as pd
 import numpy as np
 import re
 from plotnine import *
-from rpy2.robjects.packages import importr
-from rpy2 import robjects as ro
 
 from scripts.qiime2_helper.metadata_helper import (
 	load_metadata
