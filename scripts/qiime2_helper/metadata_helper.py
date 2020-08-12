@@ -44,9 +44,17 @@ def convert_col_dtype(df, col, dtype):
 	Convert given column type to specified dtype
 	"""
 	if(col not in df.columns):
-		raise AXIOME3Error("Column, {}, does not exist in the dataframe".format(col))
+		raise AXIOME3Error("Column, '{}', does not exist in the dataframe".format(col))
 
-	df[col] = df[col].astype(dtype)
+	try:
+		df[col] = df[col].astype(dtype)
+	except ValueError:
+		raise AXIOME3Error("Column, '{col}', cannot be converted to data type, '{dtype}'".format(
+				col=col,
+				dtype=dtype
+			))
+	except TypeError:
+		raise AXIOME3Error("Data type, '{dtype}', is not supported by pandas".format(dtype=dtype))
 
 	return df
 

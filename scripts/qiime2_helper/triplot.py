@@ -8,6 +8,7 @@ from qiime2 import (
 	Metadata
 )
 from qiime2.plugins.taxa.methods import collapse
+from qiime2.plugins.feature_table.methods import rarefy
 
 from rpy2.robjects.vectors import IntVector
 from rpy2.robjects.packages import importr
@@ -36,7 +37,7 @@ from scripts.qiime2_helper.rpy2_helper import (
 # Custom exception
 from exceptions.exception import AXIOME3Error
 
-def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv"):
+def collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth=0, collapse_level="asv"):
 	"""
 	Collapse feature table to user specified taxa level (ASV by default).
 
@@ -51,6 +52,14 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 	if(collapse_level not in VALID_COLLAPSE_LEVELS):
 		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
+
+	# Rarefy the table to user specified sampling depth
+	if(sampling_depth < 0):
+		raise AXIOME3Error("Sampling depth cannot be a negative number!")
+	# don't rarefy is sampling depth equals 0
+	if(sampling_depth > 0):
+		rarefied = rarefy(feature_table_artifact, sampling_depth=sampling_depth)
+		feature_table_artifact = rarefied.rarefied_table
 
 	# handle ASV case
 	if(collapse_level == "asv"):
@@ -202,8 +211,9 @@ def combine_projection_arrow_with_r_sqr(projection):
 	projection_vectors = projection[projection.names.index('vectors')]
 	arrow = projection_vectors[projection_vectors.names.index('arrows')]
 	r_sqr = projection_vectors[projection_vectors.names.index('r')]
+	pvals = projection_vectors[projection_vectors.names.index('pvals')]
 
-	projection_matrix = base.cbind(arrow, R2=r_sqr)
+	projection_matrix = base.cbind(arrow, R2=r_sqr, pvals=pvals)
 
 	return projection_matrix
 
@@ -223,7 +233,7 @@ def generate_vector_arrow_df(projection_df, R2_threshold):
 	#	raise ValueError("No entries left after applying R2 threshold, {}".format(R2_threshold))
 
 	filtered_df = projection_df.loc[(projection_df['R2'] > R2_threshold), ]
-	vector_arrow_df = filtered_df.drop(columns=['R2'])
+	vector_arrow_df = filtered_df.drop(columns=['R2', 'pvals'])
 	vector_arrow_df = vector_arrow_df.mul(np.sqrt(filtered_df['R2']), axis=0)
 
 	return vector_arrow_df
@@ -296,8 +306,8 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, ordination_collapse_level="asv", wascores_collapse_level="phylum",
-	dissmilarity_index="Bray-Curtis", abundance_threshold=0.1, R2_threshold=0.1,
+	taxonomy_artifact_path, sampling_depth=0, ordination_collapse_level="asv", 
+	wascores_collapse_level="phylum", dissmilarity_index="Bray-Curtis", R2_threshold=0.1, 
 	wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
@@ -310,8 +320,8 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Load feature table and collapse
 	feature_table_artifact = check_artifact_type(feature_table_artifact_path, "feature_table")
 	taxonomy_artifact = check_artifact_type(taxonomy_artifact_path, "taxonomy")
-	ordination_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, ordination_collapse_level)
-	abundance_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, wascores_collapse_level)
+	ordination_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth, ordination_collapse_level)
+	abundance_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth, wascores_collapse_level)
 
 	# Rename taxa for wascores collapsed df
 	original_taxa = pd.Series(abundance_collapsed_df["Taxon"])
@@ -322,16 +332,8 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	abundance_collapsed_df_reindexed = abundance_collapsed_df.set_index('Taxa')
 	abundance_collapsed_df_reindexed = abundance_collapsed_df_reindexed.drop(['Taxon'], axis="columns")
 
-	# filter ordination df by abundance
-	ordination_filtered_df = filter_by_abundance(
-		df=ordination_collapsed_df.drop(['Taxon'], axis="columns"),
-		abundance_threshold=abundance_threshold,
-		percent_axis=0,
-		filter_axis=1
-	)
-
 	# transpose feature table so that it has samples as rows, taxa/ASV as columns
-	ordination_transposed_df = ordination_filtered_df.T
+	ordination_transposed_df = ordination_collapsed_df.drop(['Taxon'], axis="columns").T
 	abundance_transposed_df = abundance_collapsed_df_reindexed.T
 
 	# Remove samples that have total counts <= 5 (R complains if total count <= 5)
@@ -382,12 +384,12 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Combine ordination df and sample metadata df
 	merged_df = renamed_ordination_point_df.join(intersection_sample_metadata_df, how="inner")
 
-	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained
+	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained, projection_df
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
 	point_size=6, x_axis_text_size=10, y_axis_text_size=10, legend_title_size=10,
-	legend_text_size=10):
+	legend_text_size=10, fill_variable_dtype="category"):
 	"""
 
 	"""
@@ -395,8 +397,12 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	if(PC_axis_one == PC_axis_two):
 		raise AXIOME3Error("PC axis one and PC axis two cannot be equal!")
 
-	# Remove unused categories
-	merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
+	# convert data type to user specified value
+	merged_df = convert_col_dtype(merged_df, fill_variable, fill_variable_dtype)
+
+	if(str(merged_df[fill_variable].dtype) == 'category'):
+		# Remove unused categories
+		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
 	# PC axes to visualize
 	pc1 = 'PC'+str(PC_axis_one)
@@ -525,18 +531,18 @@ def save_plot(plot, filename, output_dir='.',
 		units=units
 	)
 
-#feature_table_artifact_path = "/backend/triplot/merged_table.qza"
-#taxonomy_artifact_path = "/backend/triplot/taxonomy.qza"
-#sample_metadata_path = "/backend/triplot/modified_aq_survey_metadata_triplots.txt"
-#env_metadata_path = "/backend/triplot/aq_survey_env_num.txt"
-#merged_df, vector_arrow_df, wascores_df, proportion_explained = prep_triplot_input(
+#feature_table_artifact_path = "/data/triplot_paper/merged_table.qza"
+#taxonomy_artifact_path = "/data/triplot_paper/taxonomy.qza"
+#sample_metadata_path = "/data/triplot_paper/metadata_MaCoTe.tsv"
+#env_metadata_path = "/data/triplot_paper/environmental_metadata.tsv"
+#merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df = prep_triplot_input(
 #	sample_metadata_path,
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
+# 	sampling_depth=6000,
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
-#	abundance_threshold=0.05,
 #	wa_threshold=0.01,
 #	R2_threshold=0.15,
 #	PC_axis_one=1,
@@ -547,12 +553,12 @@ def save_plot(plot, filename, output_dir='.',
 #	vector_arrow_df,
 #	wascores_df,
 #	proportion_explained,
-#	fill_variable="I5_Index_ID",
+#	fill_variable="NTCGroup",
+#	fill_variable_dtype="category",
 #	PC_axis_one=1,
 #	PC_axis_two=2
 #)
 #save_plot(triplot, "plot")
-
-
-#feature_table_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/dada2/merged/merged_table.qza"
-#taxonomy_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/taxonomy/taxonomy.qza"
+#
+# Sample that were omitted
+# R2 stats for the vectora arrow
