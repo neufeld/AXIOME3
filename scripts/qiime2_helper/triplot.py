@@ -8,12 +8,11 @@ from qiime2 import (
 	Metadata
 )
 from qiime2.plugins.taxa.methods import collapse
+from qiime2.plugins.feature_table.methods import rarefy
 
 from rpy2.robjects.vectors import IntVector
 from rpy2.robjects.packages import importr
 import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
 
 from scripts.qiime2_helper.metadata_helper import (
 	load_metadata,
@@ -38,7 +37,7 @@ from scripts.qiime2_helper.rpy2_helper import (
 # Custom exception
 from exceptions.exception import AXIOME3Error
 
-def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv"):
+def collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth=0, collapse_level="asv"):
 	"""
 	Collapse feature table to user specified taxa level (ASV by default).
 
@@ -53,6 +52,14 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level="asv
 
 	if(collapse_level not in VALID_COLLAPSE_LEVELS):
 		raise AXIOME3Error("Specified collapse level, {collapse_level}, is NOT valid!".format(collapse_level=collapse_level))
+
+	# Rarefy the table to user specified sampling depth
+	if(sampling_depth < 0):
+		raise AXIOME3Error("Sampling depth cannot be a negative number!")
+	# don't rarefy is sampling depth equals 0
+	if(sampling_depth > 0):
+		rarefied = rarefy(feature_table_artifact, sampling_depth=sampling_depth)
+		feature_table_artifact = rarefied.rarefied_table
 
 	# handle ASV case
 	if(collapse_level == "asv"):
@@ -109,18 +116,19 @@ def filter_by_total_count(feature_table_df, sum_axis=1):
 
 	return filtered_df
 
-def find_sample_intersection(feature_table_df, sample_metadata_df, environmental_metadata_df):
+def find_sample_intersection(feature_table_df, abundance_df, sample_metadata_df, environmental_metadata_df):
 	"""
 	Find intersection of feature table, sample metadata, and environmental metadata.
 
 	Inputs:
 		- feature_table_df: feature table in pandas DataFrame (samples as row, taxa/ASV as columns)
+		- abundance_df: feature table in pandas DataFrame (samples as row, taxa/ASV as columns; to overlay as taxa bubbles later)
 		- sample_metadata_df: sample metadata in pandas DataFrame (samples as row, metadata as columns)
 		- environmental_metadata_df: environmental metadata in pandas DataFrame (samples as row, metadata as columns)
 
 		Assumes sampleID as index
 	"""
-	combined_df = pd.concat([feature_table_df, sample_metadata_df, environmental_metadata_df], join="inner", axis=1)
+	combined_df = pd.concat([feature_table_df, abundance_df, sample_metadata_df, environmental_metadata_df], join="inner", axis=1)
 
 	intersection_samples = combined_df.index
 
@@ -128,10 +136,11 @@ def find_sample_intersection(feature_table_df, sample_metadata_df, environmental
 		raise AXIOME3Error("Feature table, sample metadata, and environmental metadata do NOT share any samples...")
 
 	intersection_feature_table_df = feature_table_df.loc[intersection_samples, ]
+	intersection_abundance_df = abundance_df.loc[intersection_samples, ]
 	intersection_sample_metadata_df = sample_metadata_df.loc[intersection_samples, ]
 	intersection_environmental_metadata_df = environmental_metadata_df.loc[intersection_samples, ]
 
-	return intersection_feature_table_df, intersection_sample_metadata_df, intersection_environmental_metadata_df
+	return intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df
 
 def calculate_dissimilarity_matrix(feature_table, method="Bray-Curtis"):
 	"""
@@ -202,8 +211,9 @@ def combine_projection_arrow_with_r_sqr(projection):
 	projection_vectors = projection[projection.names.index('vectors')]
 	arrow = projection_vectors[projection_vectors.names.index('arrows')]
 	r_sqr = projection_vectors[projection_vectors.names.index('r')]
+	pvals = projection_vectors[projection_vectors.names.index('pvals')]
 
-	projection_matrix = base.cbind(arrow, R2=r_sqr)
+	projection_matrix = base.cbind(arrow, R2=r_sqr, pvals=pvals)
 
 	return projection_matrix
 
@@ -223,7 +233,7 @@ def generate_vector_arrow_df(projection_df, R2_threshold):
 	#	raise ValueError("No entries left after applying R2 threshold, {}".format(R2_threshold))
 
 	filtered_df = projection_df.loc[(projection_df['R2'] > R2_threshold), ]
-	vector_arrow_df = filtered_df.drop(columns=['R2'])
+	vector_arrow_df = filtered_df.drop(columns=['R2', 'pvals'])
 	vector_arrow_df = vector_arrow_df.mul(np.sqrt(filtered_df['R2']), axis=0)
 
 	return vector_arrow_df
@@ -296,8 +306,9 @@ def get_variance_explained(eig_vals):
 	return proportion_explained
 
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
-	taxonomy_artifact_path, collapse_level="asv", dissmilarity_index="Bray-Curtis",abundance_threshold=0.1,
-	R2_threshold=0.1, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
+	taxonomy_artifact_path, sampling_depth=0, ordination_collapse_level="asv", 
+	wascores_collapse_level="phylum", dissmilarity_index="Bray-Curtis", R2_threshold=0.1, 
+	wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -309,43 +320,41 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Load feature table and collapse
 	feature_table_artifact = check_artifact_type(feature_table_artifact_path, "feature_table")
 	taxonomy_artifact = check_artifact_type(taxonomy_artifact_path, "taxonomy")
-	collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, collapse_level)
+	ordination_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth, ordination_collapse_level)
+	abundance_collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth, wascores_collapse_level)
 
-	original_taxa = pd.Series(collapsed_df["Taxon"])
-	row_id = pd.Series(collapsed_df.index)
+	# Rename taxa for wascores collapsed df
+	original_taxa = pd.Series(abundance_collapsed_df["Taxon"])
+	row_id = pd.Series(abundance_collapsed_df.index)
 	renamed_taxa = rename_taxa(original_taxa, row_id)
 
-	# filter by abundance
-	taxa_index_collapsed_df = collapsed_df
-	taxa_index_collapsed_df['Taxa'] = renamed_taxa
-	taxa_index_collapsed_df = taxa_index_collapsed_df.set_index('Taxa')
-	abundance_filtered_df = filter_by_abundance(
-		df=taxa_index_collapsed_df.drop(['Taxon'], axis="columns"),
-		abundance_threshold=abundance_threshold,
-		percent_axis=0,
-		filter_axis=1
-	)
+	abundance_collapsed_df['Taxa'] = renamed_taxa
+	abundance_collapsed_df_reindexed = abundance_collapsed_df.set_index('Taxa')
+	abundance_collapsed_df_reindexed = abundance_collapsed_df_reindexed.drop(['Taxon'], axis="columns")
 
 	# transpose feature table so that it has samples as rows, taxa/ASV as columns
-	transposed_df = abundance_filtered_df.T
+	ordination_transposed_df = ordination_collapsed_df.drop(['Taxon'], axis="columns").T
+	abundance_transposed_df = abundance_collapsed_df_reindexed.T
 
 	# Remove samples that have total counts <= 5 (R complains if total count <= 5)
-	count_filtered_df = filter_by_total_count(transposed_df)
+	count_filtered_df = filter_by_total_count(ordination_transposed_df)
 
 	# Find sample intersection of feature table, sample metadata, and environmental metadata
-	intersection_feature_table_df, intersection_sample_metadata_df, intersection_environmental_metadata_df = find_sample_intersection(
+	intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df = find_sample_intersection(
 		count_filtered_df,
+		abundance_transposed_df,
 		sample_metadata_df,
 		env_metadata_df
 	)
 
 	r_feature_table = convert_pd_df_to_r(intersection_feature_table_df)
+	r_abundance_table = convert_pd_df_to_r(intersection_abundance_df)
 
 	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table, method=dissmilarity_index)
 
 	ordination = calculate_ordination(r_dissimilarity_matrix)
 
-	wascores = calculate_weighted_average(ordination, r_feature_table)
+	wascores = calculate_weighted_average(ordination, r_abundance_table)
 
 	r_env_metadata = convert_pd_df_to_r(intersection_environmental_metadata_df)
 	projection = project_env_metadata_to_ordination(ordination, r_env_metadata, PC_axis_one, PC_axis_two)
@@ -354,7 +363,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	ordination_point_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(ordination[ordination.names.index('points')]))
 	ordination_eig_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(ordination[ordination.names.index('eig')]))
 	wascores_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(wascores))
-	
+
 	projection_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(combine_projection_arrow_with_r_sqr(projection)))
 
 	# generate vector arrows
@@ -366,7 +375,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	renamed_vector_arrow_df = rename_as_PC_columns(vector_arrow_df, PC_axis_one, PC_axis_two)
 
 	# Add normalized taxa count and filter by user specifed thresehold
-	normalized_wascores_df = normalized_taxa_total_abundance(renamed_wascores_df, intersection_feature_table_df)
+	normalized_wascores_df = normalized_taxa_total_abundance(renamed_wascores_df, intersection_abundance_df)
 	filtered_wascores_df = filter_by_wascore_threshold(normalized_wascores_df, wa_threshold)
 
 	# Proportion explained
@@ -375,12 +384,12 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Combine ordination df and sample metadata df
 	merged_df = renamed_ordination_point_df.join(intersection_sample_metadata_df, how="inner")
 
-	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained
+	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained, projection_df
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
 	point_size=6, x_axis_text_size=10, y_axis_text_size=10, legend_title_size=10,
-	legend_text_size=10):
+	legend_text_size=10, fill_variable_dtype="category"):
 	"""
 
 	"""
@@ -388,8 +397,12 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	if(PC_axis_one == PC_axis_two):
 		raise AXIOME3Error("PC axis one and PC axis two cannot be equal!")
 
-	# Remove unused categories
-	merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
+	# convert data type to user specified value
+	merged_df = convert_col_dtype(merged_df, fill_variable, fill_variable_dtype)
+
+	if(str(merged_df[fill_variable].dtype) == 'category'):
+		# Remove unused categories
+		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
 	# PC axes to visualize
 	pc1 = 'PC'+str(PC_axis_one)
@@ -518,32 +531,34 @@ def save_plot(plot, filename, output_dir='.',
 		units=units
 	)
 
-#feature_table_artifact_path = "/backend/triplot/merged_table.qza"
-#taxonomy_artifact_path = "/backend/triplot/taxonomy.qza"
-#sample_metadata_path = "/backend/triplot/modified_aq_survey_metadata_triplots.txt"
-#env_metadata_path = "/backend/triplot/aq_survey_env_num.txt"
-#merged_df, vector_arrow_df, wascores_df, proportion_explained = prep_triplot_input(
+#feature_table_artifact_path = "/data/triplot_paper/merged_table.qza"
+#taxonomy_artifact_path = "/data/triplot_paper/taxonomy.qza"
+#sample_metadata_path = "/data/triplot_paper/metadata_MaCoTe.tsv"
+#env_metadata_path = "/data/triplot_paper/environmental_metadata.tsv"
+#merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df = prep_triplot_input(
 #	sample_metadata_path,
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
-#	collapse_level="order",
-#	abundance_threshold=0.2,
-#	R2_threshold=0.05,
-#	PC_axis_one=2,
-#	PC_axis_two=3
+# 	sampling_depth=6000,
+#	ordination_collapse_level="asv",
+#	wascores_collapse_level="phylum",
+#	wa_threshold=0.01,
+#	R2_threshold=0.15,
+#	PC_axis_one=1,
+#	PC_axis_two=2
 #)
 #triplot = make_triplot(
 #	merged_df,
 #	vector_arrow_df,
 #	wascores_df,
 #	proportion_explained,
-#	fill_variable="I5_Index_ID",
-#	PC_axis_one=2,
-#	PC_axis_two=3
+#	fill_variable="NTCGroup",
+#	fill_variable_dtype="category",
+#	PC_axis_one=1,
+#	PC_axis_two=2
 #)
 #save_plot(triplot, "plot")
-
-
-#feature_table_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/dada2/merged/merged_table.qza"
-#taxonomy_artifact_path = "/pipeline/AXIOME3/scripts/qiime2_helper/qiime2_2020_6_analysis_output/taxonomy/taxonomy.qza"
+#
+# Sample that were omitted
+# R2 stats for the vectora arrow
