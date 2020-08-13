@@ -1,4 +1,6 @@
 import os
+from math import floor
+from textwrap import dedent
 import pandas as pd
 import numpy as np
 from plotnine import *
@@ -34,6 +36,10 @@ from scripts.qiime2_helper.rpy2_helper import (
 	convert_r_df_to_pd_df
 )
 
+from scripts.qiime2_helper.plotnine_helper import (
+    add_fill_colours_from_users
+)
+
 # Custom exception
 from exceptions.exception import AXIOME3Error
 
@@ -58,7 +64,10 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth=0, c
 		raise AXIOME3Error("Sampling depth cannot be a negative number!")
 	# don't rarefy is sampling depth equals 0
 	if(sampling_depth > 0):
-		rarefied = rarefy(feature_table_artifact, sampling_depth=sampling_depth)
+		try:
+			rarefied = rarefy(feature_table_artifact, sampling_depth=sampling_depth)
+		except ValueError:
+			raise AXIOME3Error("No samples or features left after rarefying at {}".format(sampling_depth))
 		feature_table_artifact = rarefied.rarefied_table
 
 	# handle ASV case
@@ -73,14 +82,20 @@ def collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth=0, c
 		taxonomy_df = taxonomy_artifact.view(pd.DataFrame)
 
 		# Combine the two df (joins on index (ASV))
-		combined_df = feature_table_df_T.join(taxonomy_df)
+		combined_df = feature_table_df_T.join(taxonomy_df, how='inner')
 
 		# Drop "Confidence" column and use numeric index
 		final_df = combined_df.drop(["Confidence"], axis="columns").reset_index(drop=True)
 
+		if(final_df.shape[0] == 0 or final_df.shape[1] == 0):
+			raise AXIOME3Error("No data to process. Please check if 1. input feature table is empty, 2. input taxonomy is empty, 3. input feature table and taxonomy share common ASVs.")
+
 		return final_df
 
-	table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_COLLAPSE_LEVELS[collapse_level])
+	try:
+		table_artifact = collapse(table=feature_table_artifact, taxonomy=taxonomy_artifact, level=VALID_COLLAPSE_LEVELS[collapse_level])
+	except ValueError:
+		raise AXIOME3Error("No data to process. Please check if 1. input feature table is empty, 2. input taxonomy is empty, 3. input feature table and taxonomy share common features.")
 
 	# By default, it has samples as rows, and taxa as columns
 	collapsed_df = table_artifact.collapsed_table.view(pd.DataFrame)
@@ -140,7 +155,22 @@ def find_sample_intersection(feature_table_df, abundance_df, sample_metadata_df,
 	intersection_sample_metadata_df = sample_metadata_df.loc[intersection_samples, ]
 	intersection_environmental_metadata_df = environmental_metadata_df.loc[intersection_samples, ]
 
-	return intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df
+	# summary about samples not used
+	feature_table_omitted_samples = ','.join([str(sample) for sample in feature_table_df.index if sample not in intersection_samples])
+	sample_metadata_omitted_samples = ','.join([str(sample) for sample in sample_metadata_df.index if sample not in intersection_samples])
+	environmental_metadata_omitted_samples = ','.join([str(sample) for sample in environmental_metadata_df.index if sample not in intersection_samples])
+	
+	sample_summary = dedent("""\
+		Omitted samples in feature table,{feature_table_omitted_samples}
+		Omitted samples in sample metadata,{sample_metadata_omitted_samples}
+		Omitted samples in environmental metadata,{environmental_metadata_omitted_samples}
+	""".format(
+		feature_table_omitted_samples=feature_table_omitted_samples,
+		sample_metadata_omitted_samples=sample_metadata_omitted_samples,
+		environmental_metadata_omitted_samples=environmental_metadata_omitted_samples
+	))
+
+	return intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df, sample_summary
 
 def calculate_dissimilarity_matrix(feature_table, method="Bray-Curtis"):
 	"""
@@ -340,7 +370,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	count_filtered_df = filter_by_total_count(ordination_transposed_df)
 
 	# Find sample intersection of feature table, sample metadata, and environmental metadata
-	intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df = find_sample_intersection(
+	intersection_feature_table_df, intersection_abundance_df, intersection_sample_metadata_df, intersection_environmental_metadata_df, sample_summary = find_sample_intersection(
 		count_filtered_df,
 		abundance_transposed_df,
 		sample_metadata_df,
@@ -384,12 +414,13 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	# Combine ordination df and sample metadata df
 	merged_df = renamed_ordination_point_df.join(intersection_sample_metadata_df, how="inner")
 
-	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained, projection_df
+	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained, projection_df, sample_summary
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
 	point_size=6, x_axis_text_size=10, y_axis_text_size=10, legend_title_size=10,
-	legend_text_size=10, fill_variable_dtype="category"):
+	legend_text_size=10, fill_variable_dtype="category", palette='Paired',
+	brewer_type='qual',):
 	"""
 
 	"""
@@ -403,6 +434,10 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	if(str(merged_df[fill_variable].dtype) == 'category'):
 		# Remove unused categories
 		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
+
+	# Scale text annotation by this times point_size
+	scale_factor = 0.7
+	text_anno_size = floor(scale_factor*point_size)
 
 	# PC axes to visualize
 	pc1 = 'PC'+str(PC_axis_one)
@@ -420,7 +455,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	)
 	base_points = geom_point(size=point_size, alpha=alpha, stroke=stroke)
 
-	base_anno = geom_text(size=4)
+	base_anno = geom_text(size=text_anno_size)
 
 	PC_axis_one_variance = str(round(proportion_explained.loc[pc1, 'proportion_explained'],2))
 	PC_axis_two_variance = str(round(proportion_explained.loc[pc2, 'proportion_explained'],2))
@@ -448,6 +483,11 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		theme_bw() + 
 		my_themes)
 
+	# Add point colour if categorical
+	if(str(merged_df[fill_variable].dtype) == 'category'):
+		fill_name = str(fill_variable)
+		plot = add_fill_colours_from_users(plot, fill_name, palette, brewer_type)
+
 	# Taxa points
 	if(wascores_df.shape[0] > 0):
 		taxa_points = geom_point(
@@ -473,7 +513,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			),
 			data=wascores_df,
 			inherit_aes=False,
-			size=4
+			size=text_anno_size
 		)
 
 		if(point_size <= 5):
@@ -507,7 +547,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 				label=vector_arrow_df.index,
 				colour=vector_arrow_df.index
 			),
-			size=4,
+			size=text_anno_size,
 			data=vector_arrow_df,
 			inherit_aes=False,
 			show_legend=False
@@ -535,12 +575,12 @@ def save_plot(plot, filename, output_dir='.',
 #taxonomy_artifact_path = "/data/triplot_paper/taxonomy.qza"
 #sample_metadata_path = "/data/triplot_paper/metadata_MaCoTe.tsv"
 #env_metadata_path = "/data/triplot_paper/environmental_metadata.tsv"
-#merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df = prep_triplot_input(
+#merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df, sample_summary = prep_triplot_input(
 #	sample_metadata_path,
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
-# 	sampling_depth=6000,
+# 	sampling_depth=600,
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
 #	wa_threshold=0.01,
@@ -559,6 +599,3 @@ def save_plot(plot, filename, output_dir='.',
 #	PC_axis_two=2
 #)
 #save_plot(triplot, "plot")
-#
-# Sample that were omitted
-# R2 stats for the vectora arrow
