@@ -247,7 +247,7 @@ def combine_projection_arrow_with_r_sqr(projection):
 
 	return projection_matrix
 
-def generate_vector_arrow_df(projection_df, R2_threshold):
+def generate_vector_arrow_df(projection_df, R2_threshold, pval_threshold):
 	"""
 	Generate vector arrows to overlay on triplot, and optionally filter it by user specified threshold
 
@@ -262,7 +262,8 @@ def generate_vector_arrow_df(projection_df, R2_threshold):
 	#if((projection_df['R2'] > R2_threshold).any() == False):
 	#	raise ValueError("No entries left after applying R2 threshold, {}".format(R2_threshold))
 
-	filtered_df = projection_df.loc[(projection_df['R2'] > R2_threshold), ]
+	filter_criteria = (projection_df['R2'] >= R2_threshold) & (projection_df['pvals'] <= pval_threshold)
+	filtered_df = projection_df.loc[filter_criteria, ]
 	vector_arrow_df = filtered_df.drop(columns=['R2', 'pvals'])
 	vector_arrow_df = vector_arrow_df.mul(np.sqrt(filtered_df['R2']), axis=0)
 
@@ -338,7 +339,7 @@ def get_variance_explained(eig_vals):
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
 	taxonomy_artifact_path, sampling_depth=0, ordination_collapse_level="asv", 
 	wascores_collapse_level="phylum", dissmilarity_index="Bray-Curtis", R2_threshold=0.1, 
-	wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
+	pval_threshold=0.05, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -397,7 +398,7 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 	projection_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(combine_projection_arrow_with_r_sqr(projection)))
 
 	# generate vector arrows
-	vector_arrow_df = generate_vector_arrow_df(projection_df, R2_threshold)
+	vector_arrow_df = generate_vector_arrow_df(projection_df, R2_threshold, pval_threshold)
 
 	# Rename dataframe columns
 	renamed_ordination_point_df = rename_as_PC_columns(ordination_point_df)
@@ -420,7 +421,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
 	point_size=6, x_axis_text_size=10, y_axis_text_size=10, legend_title_size=10,
 	legend_text_size=10, fill_variable_dtype="category", palette='Paired',
-	brewer_type='qual',):
+	brewer_type='qual', sample_text_size=6, taxa_text_size=6, vector_arrow_text_size=6):
 	"""
 
 	"""
@@ -434,10 +435,6 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	if(str(merged_df[fill_variable].dtype) == 'category'):
 		# Remove unused categories
 		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
-
-	# Scale text annotation by this times point_size
-	scale_factor = 0.7
-	text_anno_size = floor(scale_factor*point_size)
 
 	# PC axes to visualize
 	pc1 = 'PC'+str(PC_axis_one)
@@ -455,7 +452,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	)
 	base_points = geom_point(size=point_size, alpha=alpha, stroke=stroke)
 
-	base_anno = geom_text(size=text_anno_size)
+	base_anno = geom_text(size=taxa_text_size)
 
 	PC_axis_one_variance = str(round(proportion_explained.loc[pc1, 'proportion_explained'],2))
 	PC_axis_two_variance = str(round(proportion_explained.loc[pc2, 'proportion_explained'],2))
@@ -513,7 +510,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			),
 			data=wascores_df,
 			inherit_aes=False,
-			size=text_anno_size
+			size=taxa_text_size
 		)
 
 		if(point_size <= 5):
@@ -547,7 +544,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 				label=vector_arrow_df.index,
 				colour=vector_arrow_df.index
 			),
-			size=text_anno_size,
+			size=vector_arrow_text_size,
 			data=vector_arrow_df,
 			inherit_aes=False,
 			show_legend=False
@@ -584,7 +581,8 @@ def save_plot(plot, filename, output_dir='.',
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
 #	wa_threshold=0.01,
-#	R2_threshold=0.15,
+#	R2_threshold=0.05,
+#	pval_threshold=0.15,
 #	PC_axis_one=1,
 #	PC_axis_two=2
 #)
