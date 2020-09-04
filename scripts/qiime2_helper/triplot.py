@@ -1,4 +1,5 @@
 import os
+import subprocess
 from math import floor
 from textwrap import dedent
 import pandas as pd
@@ -11,10 +12,6 @@ from qiime2 import (
 )
 from qiime2.plugins.taxa.methods import collapse
 from qiime2.plugins.feature_table.methods import rarefy
-
-from rpy2.robjects.vectors import IntVector
-from rpy2.robjects.packages import importr
-import rpy2.robjects as ro
 
 from scripts.qiime2_helper.metadata_helper import (
 	load_metadata,
@@ -29,19 +26,28 @@ from scripts.qiime2_helper.artifact_helper import (
 	rename_taxa
 )
 
-from scripts.qiime2_helper.rpy2_helper import (
-	VEGDIST_OPTIONS,
-	convert_pd_df_to_r,
-	convert_r_matrix_to_r_df,
-	convert_r_df_to_pd_df
-)
-
 from scripts.qiime2_helper.plotnine_helper import (
-    add_fill_colours_from_users
+		add_fill_colours_from_users
 )
 
 # Custom exception
 from exceptions.exception import AXIOME3Error
+
+VEGDIST_OPTIONS = {
+	"Manhattan": "manhattan",
+	"Euclidean": "euclidean",
+	"Canberra": "canberra",
+	"Bray-Curtis": "bray",
+	"Kulczynski": "kulczynski",
+	"Jaccard": "jaccard",
+	"Gower": "gower",
+	"altGower": "altGower",
+	"Morisita": "morisita",
+	"Horn-Morisita": "horn",
+	"Chao": "chao",
+	"Cao": "cao",
+	"Mahalanobis":"mahalanobis"
+}
 
 def collapse_taxa(feature_table_artifact, taxonomy_artifact, sampling_depth=0, collapse_level="asv"):
 	"""
@@ -339,7 +345,7 @@ def get_variance_explained(eig_vals):
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
 	taxonomy_artifact_path, sampling_depth=0, ordination_collapse_level="asv", 
 	wascores_collapse_level="phylum", dissmilarity_index="Bray-Curtis", R2_threshold=0.1, 
-	pval_threshold=0.05, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2):
+	pval_threshold=0.05, wa_threshold=0.1, PC_axis_one=1, PC_axis_two=2, output_dir='.'):
 
 	# Load sample metadata
 	sample_metadata_df = load_metadata(sample_metadata_path)
@@ -378,44 +384,71 @@ def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_ar
 		env_metadata_df
 	)
 
-	r_feature_table = convert_pd_df_to_r(intersection_feature_table_df)
-	r_abundance_table = convert_pd_df_to_r(intersection_abundance_df)
+	process_input_with_R(intersection_feature_table_df, intersection_abundance_df,
+		intersection_sample_metadata_df, intersection_environmental_metadata_df,
+		VEGDIST_OPTIONS[dissmilarity_index], R2_threshold, pval_threshold, wa_threshold,
+		PC_axis_one, PC_axis_two, output_dir)
 
-	r_dissimilarity_matrix = calculate_dissimilarity_matrix(r_feature_table, method=dissmilarity_index)
+	# After successful subprocess call, there should be intermediate output files...
+	# Elegant way to do this?
+	merged_df_path = os.path.join(output_dir, "processed_merged_df.csv")
+	proj_arrow_df_path = os.path.join(output_dir, "processed_vector_arrow_df.csv")
+	filtered_wa_df_path = os.path.join(output_dir, "processed_wa_df.csv")
+	proj_env_df_path = os.path.join(output_dir, "processed_projection_df.csv")
+	proportion_df_path = os.path.join(output_dir, "processed_proportion_explained_df.csv")
 
-	ordination = calculate_ordination(r_dissimilarity_matrix)
-
-	wascores = calculate_weighted_average(ordination, r_abundance_table)
-
-	r_env_metadata = convert_pd_df_to_r(intersection_environmental_metadata_df)
-	projection = project_env_metadata_to_ordination(ordination, r_env_metadata, PC_axis_one, PC_axis_two)
-
-	# convert to pandas DataFrame
-	ordination_point_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(ordination[ordination.names.index('points')]))
-	ordination_eig_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(ordination[ordination.names.index('eig')]))
-	wascores_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(wascores))
-
-	projection_df = convert_r_df_to_pd_df(convert_r_matrix_to_r_df(combine_projection_arrow_with_r_sqr(projection)))
-
-	# generate vector arrows
-	vector_arrow_df = generate_vector_arrow_df(projection_df, R2_threshold, pval_threshold)
-
-	# Rename dataframe columns
-	renamed_ordination_point_df = rename_as_PC_columns(ordination_point_df)
-	renamed_wascores_df = rename_as_PC_columns(wascores_df)
-	renamed_vector_arrow_df = rename_as_PC_columns(vector_arrow_df, PC_axis_one, PC_axis_two)
-
-	# Add normalized taxa count and filter by user specifed thresehold
-	normalized_wascores_df = normalized_taxa_total_abundance(renamed_wascores_df, intersection_abundance_df)
-	filtered_wascores_df = filter_by_wascore_threshold(normalized_wascores_df, wa_threshold)
-
-	# Proportion explained
-	proportion_explained = get_variance_explained(ordination_eig_df)
-
-	# Combine ordination df and sample metadata df
-	merged_df = renamed_ordination_point_df.join(intersection_sample_metadata_df, how="inner")
+	# Read back into pandas dataframes
+	merged_df = pd.read_csv(merged_df_path)
+	renamed_vector_arrow_df = pd.read_csv(proj_arrow_df_path)
+	filtered_wascores_df = pd.read_csv(filtered_wa_df_path)
+	proportion_explained = pd.read_csv(proportion_df_path)
+	projection_df = pd.read_csv(proj_env_df_path)
 
 	return merged_df, renamed_vector_arrow_df, filtered_wascores_df, proportion_explained, projection_df, sample_summary
+
+def process_input_with_R(intersection_feature_table_df, intersection_abundance_df,
+	intersection_sample_metadata_df, intersection_environmental_metadata_df,
+	dissmilarity_index, R2_threshold, pval_threshold, wa_threshold,
+	PC_axis_one, PC_axis_two, output_dir):
+
+	feature_table_filepath = os.path.join(output_dir, "feature_table.csv")
+	taxa_filepath = os.path.join(output_dir, "abundance_df.csv")
+	metadata_path = os.path.join(output_dir, "metadata_df.csv")
+	env_filepath = os.path.join(output_dir, "env_metadata_df.csv")
+	
+	intersection_feature_table_df.to_csv(feature_table_filepath, index_label="SampleID")
+	intersection_abundance_df.to_csv(taxa_filepath, index_label="SampleID")
+	intersection_sample_metadata_df.to_csv(metadata_path, index_label="SampleID")
+	intersection_environmental_metadata_df.to_csv(env_filepath, index_label="SampleID")
+
+	cmd = [
+		'Rscript',
+		'/pipeline/AXIOME3/scripts/qiime2_helper/pcoa_triplot.R',
+		feature_table_filepath,
+		taxa_filepath,
+		metadata_path,
+		env_filepath,
+		dissmilarity_index,
+		str(R2_threshold),
+		str(pval_threshold),
+		str(wa_threshold),
+		str(PC_axis_one),
+		str(PC_axis_two),
+		output_dir
+	]
+
+	proc = subprocess.Popen(
+		cmd,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE
+	)
+
+	stdout, stderr = proc.communicate()
+
+	return_code = proc.returncode
+
+	if not (return_code == 0):
+		raise AXIOME3Error("R error: " + stderr.decode('utf-8'))
 
 def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 	fill_variable, PC_axis_one=1, PC_axis_two=2, alpha=0.9, stroke=0.6,
@@ -572,16 +605,17 @@ def save_plot(plot, filename, output_dir='.',
 #taxonomy_artifact_path = "/data/triplot_paper/taxonomy.qza"
 #sample_metadata_path = "/data/triplot_paper/metadata_MaCoTe.tsv"
 #env_metadata_path = "/data/triplot_paper/environmental_metadata.tsv"
+#
 #merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df, sample_summary = prep_triplot_input(
 #	sample_metadata_path,
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
-# 	sampling_depth=600,
+#	sampling_depth=600,
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
-#	wa_threshold=0.01,
-#	R2_threshold=0.05,
+#	wa_threshold=0.51,
+#	R2_threshold=0.35,
 #	pval_threshold=0.15,
 #	PC_axis_one=1,
 #	PC_axis_two=2
