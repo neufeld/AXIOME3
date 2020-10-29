@@ -159,7 +159,8 @@ def add_discrete_shape(plot, n_shapes, name):
     alphabet_markers = ['$' + letter + '$' for letter in alphabets]
     markers.extend(alphabet_markers)
 
-    plot = plot + scale_shape_manual(values=markers[0:n_shapes], name=name)
+    #plot = plot + scale_shape_manual(values=markers[0:n_shapes], name=name)
+    plot = plot + scale_shape_discrete(unfilled=False, name=name)
 
     return plot
 
