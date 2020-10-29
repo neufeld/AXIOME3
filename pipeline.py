@@ -605,6 +605,36 @@ class Merge_Denoise(luigi.Task):
                     self.output()['rep_seqs'].path],
                     self)
 
+class Merge_Denoise_Stats(luigi.Task):
+    dada2_dir = Output_Dirs().denoise_dir
+    merged_dir = os.path.join(dada2_dir, "merged")
+
+    def requires(self):
+        return Denoise()
+
+    def output(self):
+        merged_denoise_stats = os.path.join(self.merged_dir, "merged_stats_dada2.qza")
+        merged_denoise_json = os.path.join(self.merged_dir, "merged_stats_dada2.json")
+
+        output = {
+            "qza": luigi.LocalTarget(merged_denoise_stats),
+            "json": luigi.LocalTarget(merged_denoise_json)
+        }
+        return output
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.merged_dir],
+                self)
+
+        stats_df = artifact_helper.combine_dada2_stats_as_df(self.dada2_dir)
+        stats_artifact = artifact_helper.import_dada2_stats_df_to_q2(stats_df)
+
+        stats_df.to_json(self.output()["json"].path, orient='index')
+        stats_artifact.save(self.output()["qza"].path)
+
 class Sample_Count_Summary(luigi.Task):
     out_dir = Output_Dirs().denoise_dir
 
@@ -1800,6 +1830,36 @@ class Denoise_Tabulate(luigi.Task):
 
             run_cmd(cmd, self)
 
+class Merge_Denoise_Tabulate(luigi.Task):
+    denoise_dir = Output_Dirs().denoise_dir
+    merged_dir = os.path.join(denoise_dir, "merged")
+
+    def requires(self):
+        return Merge_Denoise_Stats()
+
+    def output(self):
+        merged_denoise_tabulated = os.path.join(self.merged_dir, "merged_stats_dada2.qzv")
+
+        return luigi.LocalTarget(merged_denoise_tabulated)
+
+    def run(self):
+        # Make output directory
+        run_cmd(["mkdir",
+                "-p",
+                self.merged_dir],
+                self)
+
+        cmd = ["qiime",
+                "metadata",
+                "tabulate",
+                "--m-input-file",
+                self.input()["qza"].path,
+                "--o-visualization",
+                self.output().path]
+
+        run_cmd(cmd, self)
+
+
 class Sequence_Tabulate(luigi.Task):
     merged_dir = os.path.join(Output_Dirs().denoise_dir, "merged")
 
@@ -2137,8 +2197,12 @@ class Run_Denoise_Tasks(luigi.Task):
 
     def requires(self):
         return [
+            Denoise(),
             Merge_Denoise(),
-            Sample_Count_Summary()
+            Merge_Denoise_Stats(),
+            Sample_Count_Summary(),
+            Denoise_Tabulate(),
+            Merge_Denoise_Tabulate()
         ]
 
 # Dummy Class to run multiple tasks

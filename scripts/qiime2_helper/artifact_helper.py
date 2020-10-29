@@ -3,8 +3,10 @@ import numpy as np
 import re
 import sys
 import logging
+import glob
+import os
 
-from qiime2 import Artifact
+from qiime2 import Artifact, Metadata
 from argparse import ArgumentParser
 from skbio.stats import ordination
 
@@ -203,6 +205,23 @@ def calculate_percent_value(df, axis=0):
     percent_val_df = df.apply(lambda x: percent_value_operation(x), axis=axis)
 
     return percent_val_df
+
+def combine_dada2_stats_as_df(dada2_dir):
+    """
+    Combines multiple stats.qza as pandas dataframe
+    """
+    pattern = os.path.join(dada2_dir, '**/*_stats_dada2.qza')
+    stats_list = glob.glob(pattern, recursive=True)
+
+    stats_df = [Artifact.load(f).view(Metadata).to_dataframe() for f in stats_list]
+    combined_stats = pd.concat(stats_df)
+
+    return combined_stats
+
+def import_dada2_stats_df_to_q2(df):
+    combined_artifact = Artifact.import_data("SampleData[DADA2Stats]", Metadata(df))
+
+    return combined_artifact
 
 if __name__ == '__main__':
     parser = args_parse()
