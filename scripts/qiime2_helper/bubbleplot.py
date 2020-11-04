@@ -166,7 +166,9 @@ def round_percentage(df, abundance_col, num_decimal=3):
 	if(abundance_col not in df.columns):
 		raise AXIOME3Error("Column {col} does not exist in the dataframe".format(col=abundance_col))
 
-	df[abundance_col] = df[abundance_col].round(num_decimal)
+	# display value in % instead of decimal
+	df[abundance_col] = df[abundance_col]*100
+	df[abundance_col] = df[abundance_col].round(1)
 
 	return df
 
@@ -186,7 +188,7 @@ def alphabetical_sort_df(df, cols):
 	return sorted_df
 
 def prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path,
-	metadata_path=None, level="asv", groupby_taxa="phylum", keyword=None):
+	metadata_path=None, level="asv", groupby_taxa="phylum", abundance_threshold=0.1, keyword=None):
 	feature_table_artifact = check_artifact_type(feature_table_artifact_path, "feature_table")
 	taxonomy_artifact = check_artifact_type(taxonomy_artifact_path, "taxonomy")
 	collapsed_df = collapse_taxa(feature_table_artifact, taxonomy_artifact, level)
@@ -206,7 +208,7 @@ def prep_bubbleplot(feature_table_artifact_path, taxonomy_artifact_path,
 
 	long_df = pd.melt(filtered_df, id_vars=['SpeciesName', 'TaxaGroup'], var_name="SampleName", value_name="Percentage")
 
-	abundance_filtered_df = filter_by_abundance(long_df, "Percentage", 0.1)
+	abundance_filtered_df = filter_by_abundance(long_df, "Percentage", abundance_threshold)
 	rounded_abundance_filtered_df = round_percentage(abundance_filtered_df, "Percentage", 3)
 	sorted_df = alphabetical_sort_df(rounded_abundance_filtered_df, ["TaxaGroup", "SpeciesName"])
 	# Make SpeciesName column category to avoid automatic sorting
