@@ -52,6 +52,9 @@ def auto_sampling_depth(feature_table_artifact):
     feature_table_df = load_qiime2_artifact(feature_table_artifact)
     sample_count_df = generate_sample_count(feature_table_df)
 
+    # convert to int
+    sample_count_df['Count'] = sample_count_df['Count'].round(0).astype(int)
+
     min_count = sample_count_df['Count'].min() if (sample_count_df['Count'].min() > 0) else 1
 
     return str(min_count)
