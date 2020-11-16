@@ -210,7 +210,7 @@ def combine_dada2_stats_as_df(dada2_dir):
     """
     Combines multiple stats.qza as pandas dataframe
     """
-    pattern = os.path.join(dada2_dir, '**/*_stats_dada2.qza')
+    pattern = os.path.join(dada2_dir, '**/*stats_dada2.qza')
     stats_list = glob.glob(pattern, recursive=True)
 
     stats_df = [Artifact.load(f).view(Metadata).to_dataframe() for f in stats_list]
