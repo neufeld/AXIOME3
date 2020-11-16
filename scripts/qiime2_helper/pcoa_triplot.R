@@ -41,21 +41,50 @@ taxa.bubble.df <- read.table(taxa_filepath, header=TRUE, row.names=1, sep=',')
 metadata.df <- read.table(metadata_path, header=TRUE, row.names=1, sep=',')
 env.metadata.df <- read.table(env_filepath, header=TRUE, row.names=1, sep=',')
 
+if(nrow(feature.table.df) == 0) {
+	stop("feature table is empty or has no common samples with other inputs.")
+}
+
+if(nrow(taxa.bubble.df) == 0) {
+	stop("taxonomy file is empty or has no common samples with other inputs.")
+}
+
+if(nrow(metadata.df) == 0) {
+	stop("metadata file is empty or has no common samples with other inputs.")
+}
+
+if(nrow(env.metadata.df) == 0) {
+	stop("environmental metadata file is empty or has no common samples with other inputs.")
+}
+
+# number of samples in the feature table
+num.samples <- nrow(feature.table.df)
+
 # Calculate bray curtis distance
 bray <- vegdist(feature.table.df)
 
 # PCoA
-bray.pcoa <- cmdscale(bray, k=10, eig=TRUE)
+# k is bounded by [1, max(num.samples-1, 10)]; less likely to visualize more than 10 PC axes
+k <- min(10, num.samples-1)
+
+# Raise error if specified PC axis is greater than num.samples
+max.PC <- max(PC_axis_one, PC_axis_two)
+
+if(max.PC > k) {
+	message <- paste("Specified PC axis is greater than the maximum allowed value,", k)
+	stop(message)
+}
+
+
+bray.pcoa <- cmdscale(bray, k=k, eig=TRUE)
 
 # Weighted average of species
 # It finds weighted average of PCoA coordinates with taxa abundance per sample as weights.
 # In simple terms, it essentially finds contribution of each taxa to each coordinate.
-wa <- wascores(bray.pcoa$points[, 1:10], taxa.bubble.df)
-
-# TODO: If rows are missing, throw error
+wa <- wascores(bray.pcoa$points[, 1:k], taxa.bubble.df)
 
 # Project environmental data onto PCoA axis
-proj.env <- envfit(bray.pcoa, env.metadata.df)
+proj.env <- suppressMessages(envfit(bray.pcoa, env.metadata.df))
 
 # Extract vector arrows, R2, and pvals
 pvals <- proj.env$vectors$pvals
@@ -65,8 +94,22 @@ proj.env.matrix <- cbind(arrow, R2=r2, pvals=pvals)
 proj.env.df <- as.data.frame(proj.env.matrix)
 # Filter vector projection based on R2 value and pval
 pval.filtered <- proj.env.df[, "pvals"] < pval_threshold
+if(!any(pval.filtered)) {
+	message <- paste("No samples remaining after filtering by specified p-value threshold,", pval_threshold)
+	stop(message)
+}
+
 r2.filtered <- proj.env.df[, "R2"] > r2_threshold
+if(!any(r2.filtered)) {
+	message <- paste("No samples remaining after filtering by specified R2 threshold,", r2_threshold)
+	stop(message)
+}
+
 filtered <- pval.filtered & r2.filtered
+if(!any(filtered)) {
+	stop("No samples remaining after filtering by specified p-value and R2 thresholds")
+}
+
 filtered.arrow.matrix <- proj.env.df[filtered, !colnames(proj.env.df) %in% c("pvals", "R2")]
 
 # Make as dataframe
