@@ -60,8 +60,8 @@ if(nrow(env.metadata.df) == 0) {
 # number of samples in the feature table
 num.samples <- nrow(feature.table.df)
 
-# Calculate bray curtis distance
-bray <- vegdist(feature.table.df)
+# Calculate dissmilarity matrix
+dissmilarity.matrix <- vegdist(feature.table.df, method=dissmilarity_index)
 
 # PCoA
 # k is bounded by [1, max(num.samples-1, 10)]; less likely to visualize more than 10 PC axes
@@ -75,16 +75,16 @@ if(max.PC > k) {
 	stop(message)
 }
 
-
-bray.pcoa <- cmdscale(bray, k=k, eig=TRUE)
+# Calculate PCoA using the dissmilarity matrix
+pcoa <- cmdscale(dissmilarity.matrix, k=k, eig=TRUE)
 
 # Weighted average of species
 # It finds weighted average of PCoA coordinates with taxa abundance per sample as weights.
 # In simple terms, it essentially finds contribution of each taxa to each coordinate.
-wa <- wascores(bray.pcoa$points[, 1:k], taxa.bubble.df)
+wa <- wascores(pcoa$points[, 1:k], taxa.bubble.df)
 
 # Project environmental data onto PCoA axis
-proj.env <- suppressMessages(envfit(bray.pcoa, env.metadata.df))
+proj.env <- suppressMessages(envfit(pcoa, env.metadata.df))
 
 # Extract vector arrows, R2, and pvals
 pvals <- proj.env$vectors$pvals
@@ -113,7 +113,7 @@ if(!any(filtered)) {
 filtered.arrow.matrix <- proj.env.df[filtered, !colnames(proj.env.df) %in% c("pvals", "R2")]
 
 # Make as dataframe
-bray.pcoa.df <- as.data.frame(bray.pcoa$points)
+pcoa.df <- as.data.frame(pcoa$points)
 wa.df <- as.data.frame(wa)
 proj.arrow.df <- as.data.frame(filtered.arrow.matrix * sqrt(proj.env.df[r2.filtered, "R2"]))
 
@@ -122,9 +122,9 @@ proj.arrow.df <- as.data.frame(filtered.arrow.matrix * sqrt(proj.env.df[r2.filte
 env.col.names <- paste("PC", c(PC_axis_one, PC_axis_two), sep="")
 colnames(proj.arrow.df) <- env.col.names
 # Everything else
-num.cols <- 1:ncol(bray.pcoa.df)
+num.cols <- 1:ncol(pcoa.df)
 new.col.names <- paste("PC", num.cols, sep="")
-colnames(bray.pcoa.df) <- new.col.names
+colnames(pcoa.df) <- new.col.names
 colnames(wa.df) <- new.col.names
 
 # Calculate normalized, total abundance of each taxa
@@ -144,14 +144,14 @@ metadata <- read.table(metadata_path, header=TRUE, sep=",", row.names=1, comment
 metadata.df <- as.data.frame(metadata)
 
 # Merge metadata with pcoa data
-bray.pcoa.df$SampleID <- rownames(bray.pcoa.df)
+pcoa.df$SampleID <- rownames(pcoa.df)
 metadata.df$SampleID <- rownames(metadata.df)
-merged.df <- merge(bray.pcoa.df, metadata.df, by="SampleID") 
+merged.df <- merge(pcoa.df, metadata.df, by="SampleID") 
 rownames(merged.df) <- merged.df$SampleID
 
 # Calculate proportion explained
-total_variance <- sum(bray.pcoa$eig)
-proportion_explained <- (bray.pcoa$eig / total_variance) * 100
+total_variance <- sum(pcoa$eig)
+proportion_explained <- (pcoa$eig / total_variance) * 100
 proportion.df <- as.data.frame(proportion_explained)
 colnames(proportion.df) <- 'proportion_explained'
 new.prop.rownames <- paste('PC', 1:nrow(proportion.df), sep='')
