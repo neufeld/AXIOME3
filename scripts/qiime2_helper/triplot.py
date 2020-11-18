@@ -38,6 +38,7 @@ VEGDIST_OPTIONS = {
 	"Euclidean": "euclidean",
 	"Canberra": "canberra",
 	"Bray-Curtis": "bray",
+	"Binomial": "binomial",
 	"Kulczynski": "kulczynski",
 	"Jaccard": "jaccard",
 	"Gower": "gower",
