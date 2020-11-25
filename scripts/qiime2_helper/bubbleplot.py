@@ -252,7 +252,8 @@ def make_bubbleplot(df, fill_variable=None,
 									legend_key_size=20,
 									strip_text_y = element_text(angle = 0),
 									panel_spacing=0,
-									strip_background=element_blank()
+									strip_background=element_blank(),
+									text=element_text(family='Arial', colour='black')
 									)
 
 	size_guide = guides(size=False)
