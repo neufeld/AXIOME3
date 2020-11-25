@@ -243,7 +243,7 @@ def make_bubbleplot(df, fill_variable=None,
 	main_theme = theme_bw()
 	theme_styles = theme(
 									axis_text=element_text(size=8, colour='black'),
-									text=element_text(size=8),
+									text=element_text(size=8, family='Arial', colour='black'),
 									axis_text_x=element_text(angle=90),
 									plot_title=element_text(hjust=0.5),
 									legend_title=element_text(size=10, face='bold'),
@@ -252,9 +252,7 @@ def make_bubbleplot(df, fill_variable=None,
 									legend_key_size=20,
 									strip_text_y = element_text(angle = 0),
 									panel_spacing=0,
-									strip_background=element_blank(),
-									text=element_text(family='Arial', colour='black')
-									)
+									strip_background=element_blank()									)
 
 	size_guide = guides(size=False)
 	if(fill_variable is not None):
