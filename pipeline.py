@@ -35,7 +35,7 @@ logger = logging.getLogger("luigi logger")
 #luigi.configuration.add_config_path(config_path)
 
 # Path to configuration file to be used
-config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
+config_path = os.environ.get('LUIGI_CONFIG_PATH', "/pipeline/AXIOME3/configuration/luigi.cfg")
 luigi.configuration.add_config_path(config_path)
 
 # Script directory
