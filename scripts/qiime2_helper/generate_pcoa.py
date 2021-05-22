@@ -130,7 +130,7 @@ def convert_qiime2_2_skbio(pcoa_artifact):
 
     # Rename columns to have more meaningful names
     num_col = coords.shape[1]
-    col_names = ['PC'+str(i) for i in range(1, num_col+1)]
+    col_names = ['Axis ' + str(i) for i in range(1, num_col+1)]
     coords.columns = col_names
 
     pcoa.samples = coords
@@ -203,8 +203,8 @@ def generate_pcoa_plot(
 
     x_explained_idx = PC_axis1 - 1
     y_explained_idx = PC_axis2 - 1
-    pc_1 = 'PC' + str(PC_axis1)
-    pc_2 = 'PC' + str(PC_axis2)
+    pc_1 = 'Axis ' + str(PC_axis1)
+    pc_2 = 'Axis ' + str(PC_axis2)
 
     x_explained = str(round(proportions[x_explained_idx] * 100, 1))
     y_explained = str(round(proportions[y_explained_idx] * 100, 1))

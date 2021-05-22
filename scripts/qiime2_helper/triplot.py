@@ -471,8 +471,8 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
 	# PC axes to visualize
-	pc1 = 'PC'+str(PC_axis_one)
-	pc2 = 'PC'+str(PC_axis_two)
+	pc1 = 'Axis ' + str(PC_axis_one)
+	pc2 = 'Axis ' + str(PC_axis_two)
 
 	# Plot the data
 	base_plot = ggplot(
