@@ -35,7 +35,7 @@ logger = logging.getLogger("luigi logger")
 #luigi.configuration.add_config_path(config_path)
 
 # Path to configuration file to be used
-config_path = "/pipeline/AXIOME3/configuration/luigi.cfg"
+config_path = os.environ.get('LUIGI_CONFIG_PATH', "/pipeline/AXIOME3/configuration/luigi.cfg")
 luigi.configuration.add_config_path(config_path)
 
 # Script directory
@@ -679,11 +679,9 @@ class Taxonomic_Classification(luigi.Task):
 
     def output(self):
         classified_taxonomy = os.path.join(self.taxonomy_dir, "taxonomy.qza")
-        taxonomy_log = os.path.join(self.taxonomy_dir, "taxonomy_log.txt")
 
         output = {
                 "taxonomy": luigi.LocalTarget(classified_taxonomy),
-                "log": luigi.LocalTarget(taxonomy_log, format=luigi.format.Nop)
                 }
 
         return output
@@ -835,9 +833,9 @@ class Generate_Combined_Feature_Table(luigi.Task):
 
     def requires(self):
         return {
-                "Export_Taxonomy": Export_Taxonomy(),
+                "Taxonomic_Classification": Taxonomic_Classification(),
                 "Export_Representative_Seqs": Export_Representative_Seqs(),
-                "Convert_Feature_Table_to_TSV": Convert_Feature_Table_to_TSV(),
+                "Merge_Denoise": Merge_Denoise(),
                 }
 
     def output(self):
@@ -859,9 +857,9 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 self.export_dir],
                 self)
 
-        combine_table(self.input()["Convert_Feature_Table_to_TSV"].path,
+        combine_table(self.input()["Merge_Denoise"]["table"].path,
                     self.input()["Export_Representative_Seqs"].path,
-                    self.input()["Export_Taxonomy"].path,
+                    self.input()["Taxonomic_Classification"]["taxonomy"].path,
                     self.output()["table"].path)
 
         # Write log files
@@ -2243,6 +2241,38 @@ class Post_Analysis(luigi.Task):
                 Generate_Combined_Rarefied_Feature_Table(),
                 PCoA_Plots(),
                 Get_Version_Info()
+        ]
+
+class TaxonomicClassification_Module(luigi.Task):
+    """
+    Run all the steps involved in the 'Taxonomic Classification module'
+
+    Input:
+        Merge_Denoise()
+    """
+    def requires(self):
+        return [
+            Taxonomic_Classification(),
+            Taxa_Collapse(),
+            Export_Taxa_Collapse(),
+        ]
+
+class Analysis_Module(luigi.Task):
+    """
+    Run all the steps involved in the 'Analysis module'
+
+    Input:
+        Merge_Denoise()
+        Taxonomic_Classification()
+    """
+    def requires(self):
+        return [
+            Export_Representative_Seqs(),
+            Generate_Combined_Feature_Table(),
+            Phylogeny_Tree(),
+            Filter_Feature_Table(),
+            Core_Metrics_Phylogeny(),
+            PCoA_Plots(),
         ]
 
 if __name__ == '__main__':
