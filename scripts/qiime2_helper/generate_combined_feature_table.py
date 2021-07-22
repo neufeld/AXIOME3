@@ -14,6 +14,7 @@ import re
 from scripts.qiime2_helper.fasta_parser import get_id_and_seq
 import pandas as pd
 import qiime2
+from qiime2 import Artifact
 
 # GLOBAL VARIABLES
 SCRIPT_VERSION = '0.8.1'
@@ -23,6 +24,42 @@ logging.basicConfig(format='[ %(asctime)s UTC ]: %(levelname)s: %(message)s')
 logging.Formatter.converter = time.gmtime
 logger = logging.getLogger(__name__)
 
+def import_qiime2_feature_table(feature_table_filepath):
+    """
+    Convert QIIME2 feature table artifact to compatible format
+    """
+    artifact = Artifact.load(feature_table_filepath)
+    artifact_type = str(artifact.type)
+
+    if(artifact_type == "FeatureTable[Frequency]" or
+        artifact_type == "FeatureTable[RelativeFrequency]"):
+
+        feature_table_df = artifact.view(pd.DataFrame)
+
+        # return transposed version for better view
+        transposed = feature_table_df.T
+        transposed.index.name = "SampleID"
+
+        return transposed.reset_index()
+    # raise error if not feature table artifact
+    else:
+        raise ValueError("Input artifact is not of type FeatureTable[Frequency] or FeatureTable[RelativeFrequency]!")
+
+def import_qiime2_taxonomy(taxonomy_filepath):
+    """
+    Convert QIIME2 taxonomy artifact to compatible format
+    """
+    artifact = Artifact.load(taxonomy_filepath)
+    artifact_type = str(artifact.type)
+    
+    if(artifact_type == "FeatureData[Taxonomy]"):
+        taxonomy_df = artifact.view(pd.DataFrame)
+
+        return taxonomy_df.reset_index()
+    # raise error if not feature table artifact
+    else:
+        raise ValueError("Input artifact is not of type FeatureData[Taxonomy]!")
+
 def read_feature_table(feature_table_filepath):
     """
     Read a QIIME2 feature table
@@ -31,7 +68,8 @@ def read_feature_table(feature_table_filepath):
     :return: QIIME2 FeatureTable[Frequency] artifact (pandas DataFrame)
     """
     # Load the table
-    feature_table = pd.read_csv(feature_table_filepath, sep = '\t')
+    #feature_table = pd.read_csv(feature_table_filepath, sep = '\t')
+    feature_table = import_qiime2_feature_table(feature_table_filepath)
     # QIIME2 compatible ID column names
     allowed_ids = qiime2.metadata.metadata.FORMATTED_ID_HEADERS
     # First column in the feature_table df
@@ -70,7 +108,7 @@ def add_taxonomy_to_feature_table(feature_table, taxonomy_filepath):
 
     # Load taxonomy file
     logger.info('Loading taxonomy file')
-    taxonomy_table = pd.read_csv(taxonomy_filepath, sep = '\t', header = 0)
+    taxonomy_table = import_qiime2_taxonomy(taxonomy_filepath)
     taxonomy_table = taxonomy_table.rename(columns = {'Taxon': 'Consensus.Lineage'})
     taxonomy_table = taxonomy_table[['Feature ID', 'Consensus.Lineage']]
     
