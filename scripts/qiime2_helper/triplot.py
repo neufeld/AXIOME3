@@ -471,8 +471,8 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		merged_df[fill_variable] = merged_df[fill_variable].cat.remove_unused_categories()
 
 	# PC axes to visualize
-	pc1 = 'PC'+str(PC_axis_one)
-	pc2 = 'PC'+str(PC_axis_two)
+	pc1 = 'Axis ' + str(PC_axis_one)
+	pc2 = 'Axis ' + str(PC_axis_two)
 
 	# Plot the data
 	base_plot = ggplot(
@@ -488,10 +488,10 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 
 	base_anno = geom_text(size=taxa_text_size)
 
-	PC_axis_one_variance = str(round(proportion_explained.loc[pc1, 'proportion_explained'],2))
-	PC_axis_two_variance = str(round(proportion_explained.loc[pc2, 'proportion_explained'],2))
-	x_label_placeholder = pc1 + "(" + PC_axis_one_variance + "%)"
-	y_label_placeholder = pc2 + "(" + PC_axis_two_variance + "%)"
+	PC_axis_one_variance = str(round(proportion_explained.loc[pc1, 'proportion_explained'],1))
+	PC_axis_two_variance = str(round(proportion_explained.loc[pc2, 'proportion_explained'],1))
+	x_label_placeholder = pc1 + " (" + PC_axis_one_variance + "%)"
+	y_label_placeholder = pc2 + " (" + PC_axis_two_variance + "%)"
 	x_lab = xlab(x_label_placeholder)
 	y_lab = ylab(y_label_placeholder)
 
@@ -501,9 +501,10 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 		legend_key=element_blank(), # No legend background
 		axis_title_x=element_text(size=x_axis_text_size), # x axis label size
 		axis_title_y=element_text(size=y_axis_text_size), # y axis label size
-		legend_title=element_text(size=legend_title_size, face='bold'), # legend titel size
+		legend_title=element_text(size=legend_title_size, face='bold'), # legend title size
 		legend_text=element_text(size=legend_text_size), # legend text size
-		aspect_ratio=1
+		aspect_ratio=1,
+		text=element_text(family='Arial', colour='black') # Arial font, black colour
 	)
 
 	plot = (base_plot + 
@@ -530,7 +531,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			colour="black",
 			fill='none',
 			data=wascores_df,
-			stroke=0.1,
+			stroke=stroke,
 			inherit_aes=False,
 			show_legend=False
 		)
@@ -542,6 +543,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 				y=pc2,
 				label=wascores_df.index
 			),
+			colour="black",
 			data=wascores_df,
 			inherit_aes=False,
 			size=taxa_text_size
@@ -602,22 +604,22 @@ def save_plot(plot, filename, output_dir='.',
 		units=units
 	)
 
-#feature_table_artifact_path = "/data/triplot_paper/merged_table.qza"
-#taxonomy_artifact_path = "/data/triplot_paper/taxonomy.qza"
-#sample_metadata_path = "/data/triplot_paper/metadata_MaCoTe.tsv"
-#env_metadata_path = "/data/triplot_paper/environmental_metadata.tsv"
+#feature_table_artifact_path = "/data/merged_table.qza"
+#taxonomy_artifact_path = "/data/taxonomy.qza"
+#sample_metadata_path = "/data/metadata_MaCoTe.tsv"
+#env_metadata_path = "/data/environmental_metadata.tsv"
 #
 #merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df, sample_summary = prep_triplot_input(
 #	sample_metadata_path,
 #	env_metadata_path,
 #	feature_table_artifact_path,
 #	taxonomy_artifact_path,
-#	sampling_depth=600,
+#	sampling_depth=6000,
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
 #	wa_threshold=0.51,
-#	R2_threshold=0.35,
-#	pval_threshold=0.15,
+#	R2_threshold=0.05,
+#	pval_threshold=0.5,
 #	PC_axis_one=1,
 #	PC_axis_two=2
 #)

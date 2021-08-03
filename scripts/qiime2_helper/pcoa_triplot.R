@@ -119,11 +119,11 @@ proj.arrow.df <- as.data.frame(filtered.arrow.matrix * sqrt(proj.env.df[r2.filte
 
 # Rename columns
 # For env metadata df (will only have two PC axis)
-env.col.names <- paste("PC", c(PC_axis_one, PC_axis_two), sep="")
+env.col.names <- paste("Axis ", c(PC_axis_one, PC_axis_two), sep="")
 colnames(proj.arrow.df) <- env.col.names
 # Everything else
 num.cols <- 1:ncol(pcoa.df)
-new.col.names <- paste("PC", num.cols, sep="")
+new.col.names <- paste("Axis ", num.cols, sep="")
 colnames(pcoa.df) <- new.col.names
 colnames(wa.df) <- new.col.names
 
@@ -154,7 +154,7 @@ total_variance <- sum(pcoa$eig)
 proportion_explained <- (pcoa$eig / total_variance) * 100
 proportion.df <- as.data.frame(proportion_explained)
 colnames(proportion.df) <- 'proportion_explained'
-new.prop.rownames <- paste('PC', 1:nrow(proportion.df), sep='')
+new.prop.rownames <- paste('Axis ', 1:nrow(proportion.df), sep='')
 rownames(proportion.df) <- new.prop.rownames
 
 # save intermediate outputs as csv (or tsv)\
