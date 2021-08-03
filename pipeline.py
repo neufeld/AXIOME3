@@ -119,21 +119,24 @@ class Out_Prefix(luigi.Config):
 class Output_Dirs(luigi.Config):
     # Define output paths
     out_dir = Out_Prefix().prefix
+    input_upload_dir = os.path.join(out_dir, "input_upload")
     manifest_dir = os.path.join(out_dir, "manifest")
-    denoise_dir = os.path.join(out_dir, "dada2")
+    denoise_dir = os.path.join(out_dir, "denoise")
     rarefy_dir = os.path.join(out_dir, "rarefy")
-    taxonomy_dir = os.path.join(out_dir, "taxonomy")
+    taxonomy_dir = os.path.join(out_dir, "taxonomic_classification")
+    analysis_dir = os.path.join(out_dir, "analysis")
+
     export_dir = os.path.join(out_dir, "exported")
     rarefy_export_dir = os.path.join(out_dir, "rarefy_exported")
-    phylogeny_dir = os.path.join(out_dir, "phylogeny")
+    phylogeny_dir = os.path.join(analysis_dir, "phylogeny")
     collapse_dir = os.path.join(out_dir, "taxa_collapse")
 
     post_analysis_dir = os.path.join(out_dir, "post_analysis")
     filtered_dir = os.path.join(post_analysis_dir, "filtered")
     filtered_taxonomy_dir = os.path.join(filtered_dir, "taxonomy")
-    core_metric_dir = os.path.join(post_analysis_dir, "core_div_phylogeny")
+    core_metric_dir = os.path.join(analysis_dir, "metrics")
     alpha_sig_dir = os.path.join(post_analysis_dir, "alpha_group_significance")
-    pcoa_dir = os.path.join(post_analysis_dir, "pcoa_plots")
+    pcoa_dir = os.path.join(analysis_dir, "pcoa_plots")
     faprotax_dir = os.path.join(post_analysis_dir, "FAPROTAX")
     picrust_dir = os.path.join(post_analysis_dir, "PICRUST2")
 
@@ -217,7 +220,7 @@ class Import_Data(luigi.Task):
             default='SampleData[PairedEndSequencesWithQuality]')
     input_format = luigi.Parameter(default="PairedEndFastqManifestPhred33")
 
-    out_dir = Output_Dirs().out_dir
+    out_dir = Output_Dirs().input_upload_dir
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
 
@@ -299,7 +302,7 @@ class Import_Data(luigi.Task):
 class Summarize(luigi.Task):
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
-    out_dir = Output_Dirs().out_dir
+    out_dir = Output_Dirs().input_upload_dir
 
     def requires(self):
         return Import_Data()
@@ -550,14 +553,14 @@ class Denoise(luigi.Task):
 class Merge_Denoise(luigi.Task):
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
-    merged_dir = os.path.join(Output_Dirs().denoise_dir, "merged")
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Denoise()
 
     def output(self):
-        merged_table = os.path.join(self.merged_dir, "merged_table.qza")
-        merged_seqs = os.path.join(self.merged_dir, "merged_rep_seqs.qza")
+        merged_table = os.path.join(self.out_dir, "merged_table.qza")
+        merged_seqs = os.path.join(self.out_dir, "merged_rep_seqs.qza")
 
         output = {
                 'table': luigi.LocalTarget(merged_table),
@@ -570,7 +573,7 @@ class Merge_Denoise(luigi.Task):
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                self.merged_dir],
+                self.out_dir],
                 self)
 
         # Multiple runs
@@ -610,14 +613,14 @@ class Merge_Denoise(luigi.Task):
 
 class Merge_Denoise_Stats(luigi.Task):
     dada2_dir = Output_Dirs().denoise_dir
-    merged_dir = os.path.join(dada2_dir, "merged")
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Denoise()
 
     def output(self):
-        merged_denoise_stats = os.path.join(self.merged_dir, "merged_stats_dada2.qza")
-        merged_denoise_json = os.path.join(self.merged_dir, "merged_stats_dada2.json")
+        merged_denoise_stats = os.path.join(self.out_dir, "merged_stats_dada2.qza")
+        merged_denoise_json = os.path.join(self.out_dir, "merged_stats_dada2.json")
 
         output = {
             "qza": luigi.LocalTarget(merged_denoise_stats),
@@ -629,7 +632,7 @@ class Merge_Denoise_Stats(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.merged_dir],
+                self.out_dir],
                 self)
 
         stats_df = artifact_helper.combine_dada2_stats_as_df(self.dada2_dir)
@@ -672,13 +675,13 @@ class Taxonomic_Classification(luigi.Task):
     classifier = luigi.Parameter()
     n_cores = luigi.Parameter(default="1")
 
-    taxonomy_dir = Output_Dirs().taxonomy_dir
+    out_dir = Output_Dirs().taxonomy_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        classified_taxonomy = os.path.join(self.taxonomy_dir, "taxonomy.qza")
+        classified_taxonomy = os.path.join(self.out_dir, "taxonomy.qza")
 
         output = {
                 "taxonomy": luigi.LocalTarget(classified_taxonomy),
@@ -690,7 +693,7 @@ class Taxonomic_Classification(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.taxonomy_dir],
+                self.out_dir],
                 self)
 
         # Run qiime classifier
@@ -708,10 +711,6 @@ class Taxonomic_Classification(luigi.Task):
                 "--verbose"]
 
         output = run_cmd(cmd, self)
-
-        # Log result
-        with self.output()["log"].open('wb') as fh:
-            fh.write(output)
 
 class Export_Feature_Table(luigi.Task):
     export_dir = Output_Dirs().export_dir
@@ -743,12 +742,13 @@ class Export_Feature_Table(luigi.Task):
         run_cmd(cmd, self)
 
 class Export_Taxonomy(luigi.Task):
+    out_dir = Output_Dirs().taxonomy_dir
 
     def requires(self):
         return Taxonomic_Classification()
 
     def output(self):
-        tsv = os.path.join(Output_Dirs().export_dir, "taxonomy.tsv")
+        tsv = os.path.join(self.out_dir, "taxonomy.tsv")
 
         return luigi.LocalTarget(tsv)
 
@@ -757,7 +757,7 @@ class Export_Taxonomy(luigi.Task):
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
+                self.out_dir],
                 step)
 
         # Export file
@@ -772,13 +772,13 @@ class Export_Taxonomy(luigi.Task):
         run_cmd(cmd, step)
 
 class Export_Representative_Seqs(luigi.Task):
-    export_dir = Output_Dirs().export_dir
+    out_dir = Output_Dirs().analysis_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        fasta = os.path.join(self.export_dir, "dna-sequences.fasta")
+        fasta = os.path.join(self.out_dir, "dna-sequences.fasta")
 
         return luigi.LocalTarget(fasta)
 
@@ -786,7 +786,7 @@ class Export_Representative_Seqs(luigi.Task):
         # Make directory
         run_cmd(["mkdir",
                 "-p",
-                self.export_dir],
+                self.out_dir],
                 self)
 
         # Export file
@@ -801,12 +801,13 @@ class Export_Representative_Seqs(luigi.Task):
         run_cmd(cmd, self)
 
 class Convert_Feature_Table_to_TSV(luigi.Task):
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        tsv = os.path.join(Output_Dirs().export_dir, "feature-table.tsv")
+        tsv = os.path.join(self.out_dir, "feature-table.tsv")
 
         return luigi.LocalTarget(tsv)
 
@@ -815,7 +816,7 @@ class Convert_Feature_Table_to_TSV(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                Output_Dirs().export_dir],
+                self.out_dir],
                 step)
 
         # Convert to TSV
@@ -829,7 +830,7 @@ class Convert_Feature_Table_to_TSV(luigi.Task):
         ) 
 
 class Generate_Combined_Feature_Table(luigi.Task):
-    export_dir = Output_Dirs().export_dir
+    out_dir = Output_Dirs().analysis_dir
 
     def requires(self):
         return {
@@ -839,8 +840,8 @@ class Generate_Combined_Feature_Table(luigi.Task):
                 }
 
     def output(self):
-        combined_table = os.path.join(self.export_dir, "ASV_table_combined.tsv")
-        log = os.path.join(self.export_dir, "ASV_table_combined.log")
+        combined_table = os.path.join(self.out_dir, "ASV_table_combined.tsv")
+        log = os.path.join(self.out_dir, "ASV_table_combined.log")
 
 
         output = {
@@ -854,7 +855,7 @@ class Generate_Combined_Feature_Table(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.export_dir],
+                self.out_dir],
                 self)
 
         combine_table(self.input()["Merge_Denoise"]["table"].path,
@@ -867,20 +868,20 @@ class Generate_Combined_Feature_Table(luigi.Task):
         #    fh.write(logged_pre_rarefied)
 
 class Phylogeny_Tree(luigi.Task):
-    phylogeny_dir = Output_Dirs().phylogeny_dir
+    out_dir = Output_Dirs().phylogeny_dir
     n_cores = luigi.Parameter(default="1")
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        alignment = os.path.join(self.phylogeny_dir,
+        alignment = os.path.join(self.out_dir,
                 "aligned_rep_seqs.qza")
-        masked_alignment = os.path.join(self.phylogeny_dir,
+        masked_alignment = os.path.join(self.out_dir,
                 "masked_aligned_rep_seqs.qza")
-        tree = os.path.join(self.phylogeny_dir,
+        tree = os.path.join(self.out_dir,
                 "unrooted_tree.qza")
-        rooted_tree = os.path.join(self.phylogeny_dir,
+        rooted_tree = os.path.join(self.out_dir,
                 "rooted_tree.qza")
 
         out = {
@@ -896,7 +897,7 @@ class Phylogeny_Tree(luigi.Task):
         # Create output directory
         run_cmd(['mkdir',
                 '-p',
-                self.phylogeny_dir], self)
+                self.out_dir], self)
 
         # Make phylogeny tree
         cmd = ['qiime',
@@ -919,7 +920,7 @@ class Phylogeny_Tree(luigi.Task):
         run_cmd(cmd, self)
 
 class Taxa_Collapse(luigi.Task):
-    collapse_dir = Output_Dirs().collapse_dir
+    out_dir = Output_Dirs().taxonomy_dir
 
     def requires(self):
         return {"Merge_Denoise": Merge_Denoise(),
@@ -927,19 +928,19 @@ class Taxa_Collapse(luigi.Task):
                 }
 
     def output(self):
-        domain_collapsed_table = os.path.join(self.collapse_dir,
+        domain_collapsed_table = os.path.join(self.out_dir,
                 "domain_collapsed_table.qza")
-        phylum_collapsed_table = os.path.join(self.collapse_dir,
+        phylum_collapsed_table = os.path.join(self.out_dir,
                 "phylum_collapsed_table.qza")
-        class_collapsed_table = os.path.join(self.collapse_dir,
+        class_collapsed_table = os.path.join(self.out_dir,
                 "class_collapsed_table.qza")
-        order_collapsed_table = os.path.join(self.collapse_dir,
+        order_collapsed_table = os.path.join(self.out_dir,
                 "order_collapsed_table.qza")
-        family_collapsed_table = os.path.join(self.collapse_dir,
+        family_collapsed_table = os.path.join(self.out_dir,
                 "family_collapsed_table.qza")
-        genus_collapsed_table = os.path.join(self.collapse_dir,
+        genus_collapsed_table = os.path.join(self.out_dir,
                 "genus_collapsed_table.qza")
-        species_collapsed_table = os.path.join(self.collapse_dir,
+        species_collapsed_table = os.path.join(self.out_dir,
                 "species_collapsed_table.qza")
 
         output = {
@@ -958,7 +959,7 @@ class Taxa_Collapse(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.collapse_dir],
+                self.out_dir],
                 self)
 
         # Taxa collapse
@@ -985,25 +986,25 @@ class Taxa_Collapse(luigi.Task):
             run_cmd(cmd, self)
 
 class Export_Taxa_Collapse(luigi.Task):
-    collapse_dir = Output_Dirs().collapse_dir
+    out_dir = Output_Dirs().taxonomy_dir
 
     def requires(self):
         return Taxa_Collapse()
 
     def output(self):
-        exported_domain_collapsed_table = os.path.join(self.collapse_dir,
+        exported_domain_collapsed_table = os.path.join(self.out_dir,
                 "domain_collapsed_table.tsv")
-        exported_phylum_collapsed_table = os.path.join(self.collapse_dir,
+        exported_phylum_collapsed_table = os.path.join(self.out_dir,
                 "phylum_collapsed_table.tsv")
-        exported_class_collapsed_table = os.path.join(self.collapse_dir,
+        exported_class_collapsed_table = os.path.join(self.out_dir,
                 "class_collapsed_table.tsv")
-        exported_order_collapsed_table = os.path.join(self.collapse_dir,
+        exported_order_collapsed_table = os.path.join(self.out_dir,
                 "order_collapsed_table.tsv")
-        exported_family_collapsed_table = os.path.join(self.collapse_dir,
+        exported_family_collapsed_table = os.path.join(self.out_dir,
                 "family_collapsed_table.tsv")
-        exported_genus_collapsed_table = os.path.join(self.collapse_dir,
+        exported_genus_collapsed_table = os.path.join(self.out_dir,
                 "genus_collapsed_table.tsv")
-        exported_species_collapsed_table = os.path.join(self.collapse_dir,
+        exported_species_collapsed_table = os.path.join(self.out_dir,
                 "species_collapsed_table.tsv")
 
         output = {
@@ -1022,7 +1023,7 @@ class Export_Taxa_Collapse(luigi.Task):
         # Make output dir
         run_cmd(["mkdir",
                 "-p",
-                self.collapse_dir],
+                self.out_dir],
                 self)
 
         # Taxa collapse
@@ -1158,13 +1159,13 @@ class Export_Filtered_Taxa_Collapse(luigi.Task):
 # Filter sample by metadata
 class Filter_Feature_Table(luigi.Task):
     metadata_file = Samples().metadata_file
-    filtered_dir = Output_Dirs().filtered_dir
+    out_dir = Output_Dirs().analysis_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        filtered_table = os.path.join(self.filtered_dir, "filtered_table.qza")
+        filtered_table = os.path.join(self.out_dir, "filtered_table.qza")
 
         return luigi.LocalTarget(filtered_table)
 
@@ -1172,7 +1173,7 @@ class Filter_Feature_Table(luigi.Task):
         # Make output direcotry
         run_cmd(["mkdir",
                 "-p",
-                self.filtered_dir],
+                self.out_dir],
                 self)
 
         # filter-sample command
@@ -1280,6 +1281,7 @@ class Generate_Combined_Filtered_Feature_Table(luigi.Task):
 class Core_Metrics_Phylogeny(luigi.Task):
     sampling_depth = Samples().sampling_depth
     metadata_file = Samples().metadata_file
+    out_dir = Output_Dirs().core_metric_dir
 
     def requires(self):
         return {
@@ -1288,32 +1290,30 @@ class Core_Metrics_Phylogeny(luigi.Task):
                 }
 
     def output(self):
-        out_dir = Output_Dirs().core_metric_dir
-
-        rarefied_table = os.path.join(out_dir, "rarefied_table.qza")
-        faith_pd_vector = os.path.join(out_dir, "alpha_faith_pd.qza")
-        obs_otu_vector = os.path.join(out_dir, "alpha_observed_otus.qza")
-        shannon_vector = os.path.join(out_dir, "alpha_shannon.qza")
-        evenness_vector = os.path.join(out_dir, "alpha_evenness.qza")
-        unweighted_unifrac_dist_matrix = os.path.join(out_dir,
+        rarefied_table = os.path.join(self.out_dir, "rarefied_table.qza")
+        faith_pd_vector = os.path.join(self.out_dir, "alpha_faith_pd.qza")
+        obs_otu_vector = os.path.join(self.out_dir, "alpha_observed_otus.qza")
+        shannon_vector = os.path.join(self.out_dir, "alpha_shannon.qza")
+        evenness_vector = os.path.join(self.out_dir, "alpha_evenness.qza")
+        unweighted_unifrac_dist_matrix = os.path.join(self.out_dir,
                 "unweighted_unifrac_distance.qza")
-        weighted_unifrac_dist_matrix = os.path.join(out_dir,
+        weighted_unifrac_dist_matrix = os.path.join(self.out_dir,
                 "weighted_unifrac_distance.qza")
-        jaccard_dist_matrix = os.path.join(out_dir, "jaccard_distance.qza")
-        bray_curtis_dist_matrix = os.path.join(out_dir,
+        jaccard_dist_matrix = os.path.join(self.out_dir, "jaccard_distance.qza")
+        bray_curtis_dist_matrix = os.path.join(self.out_dir,
                 "bray_curtis_distance.qza")
-        unweighted_unifrac_pcoa = os.path.join(out_dir,
+        unweighted_unifrac_pcoa = os.path.join(self.out_dir,
                 "unweighted_unifrac_pcoa.qza")
-        weighted_unifrac_pcoa = os.path.join(out_dir,
+        weighted_unifrac_pcoa = os.path.join(self.out_dir,
                 "weighted_unifrac_pcoa.qza")
-        jaccard_pcoa = os.path.join(out_dir, "jaccard_pcoa.qza")
-        bray_curtis_pcoa = os.path.join(out_dir, "bray_curtis_pcoa.qza")
-        unweighted_unifrac_emperor = os.path.join(out_dir,
+        jaccard_pcoa = os.path.join(self.out_dir, "jaccard_pcoa.qza")
+        bray_curtis_pcoa = os.path.join(self.out_dir, "bray_curtis_pcoa.qza")
+        unweighted_unifrac_emperor = os.path.join(self.out_dir,
                 "unweighted_unifrac_emperor.qzv")
-        weighted_unifrac_emperor = os.path.join(out_dir,
+        weighted_unifrac_emperor = os.path.join(self.out_dir,
                 "weighted_unifrac_emperor.qzv")
-        jaccard_emperor = os.path.join(out_dir, "jaccard_emperor.qzv")
-        bray_curtis_emperor = os.path.join(out_dir, "bray_curtis_emperor.qzv")
+        jaccard_emperor = os.path.join(self.out_dir, "jaccard_emperor.qzv")
+        bray_curtis_emperor = os.path.join(self.out_dir, "bray_curtis_emperor.qzv")
 
         out = {
             'rarefied_table': luigi.LocalTarget(rarefied_table),
@@ -1356,7 +1356,7 @@ class Core_Metrics_Phylogeny(luigi.Task):
         # Create output directory
         run_cmd(['mkdir',
                 '-p',
-                Output_Dirs().core_metric_dir],
+                self.out_dir],
                 self)
 
         # If sampling depth is 0, automatically determine sampling depth
@@ -1773,7 +1773,7 @@ class Export_Picrust(luigi.Task):
 class Denoise_Tabulate(luigi.Task):
     samples = Samples().get_samples()
     is_multiple = str2bool(Samples().is_multiple)
-    denoise_dir = Output_Dirs().denoise_dir
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Denoise()
@@ -1782,7 +1782,7 @@ class Denoise_Tabulate(luigi.Task):
         if(self.is_multiple):
             output = {}
             for sample in self.samples:
-                out_dir = os.path.join(self.denoise_dir, str(sample))
+                out_dir = os.path.join(self.out_dir, str(sample))
                 prefix = str(sample) + "_stats_dada2.qzv"
                 denoise_tabulated = os.path.join(out_dir, prefix)
 
@@ -1790,7 +1790,7 @@ class Denoise_Tabulate(luigi.Task):
 
             return output
         else:
-            denoise_tabulated = os.path.join(self.denoise_dir, "stats_dada2.qzv")
+            denoise_tabulated = os.path.join(self.out_dir, "stats_dada2.qzv")
 
             return luigi.LocalTarget(denoise_tabulated)
 
@@ -1798,7 +1798,7 @@ class Denoise_Tabulate(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.denoise_dir],
+                self.out_dir],
                 self)
 
         if(self.is_multiple):
@@ -1806,7 +1806,7 @@ class Denoise_Tabulate(luigi.Task):
                 # Make sub-output directory
                 run_cmd(["mkdir",
                         '-p',
-                        os.path.join(self.denoise_dir, str(sample))],
+                        os.path.join(self.out_dir, str(sample))],
                         self)
 
                 # Run qiime metadata tabulate
@@ -1832,14 +1832,13 @@ class Denoise_Tabulate(luigi.Task):
             run_cmd(cmd, self)
 
 class Merge_Denoise_Tabulate(luigi.Task):
-    denoise_dir = Output_Dirs().denoise_dir
-    merged_dir = os.path.join(denoise_dir, "merged")
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Merge_Denoise_Stats()
 
     def output(self):
-        merged_denoise_tabulated = os.path.join(self.merged_dir, "merged_stats_dada2.qzv")
+        merged_denoise_tabulated = os.path.join(self.out_dir, "merged_stats_dada2.qzv")
 
         return luigi.LocalTarget(merged_denoise_tabulated)
 
@@ -1847,7 +1846,7 @@ class Merge_Denoise_Tabulate(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.merged_dir],
+                self.out_dir],
                 self)
 
         cmd = ["qiime",
@@ -1862,13 +1861,13 @@ class Merge_Denoise_Tabulate(luigi.Task):
 
 
 class Sequence_Tabulate(luigi.Task):
-    merged_dir = os.path.join(Output_Dirs().denoise_dir, "merged")
+    out_dir = Output_Dirs().denoise_dir
 
     def requires(self):
         return Merge_Denoise()
 
     def output(self):
-        sequence_tabulated = os.path.join(self.merged_dir, "merged_dada2_rep_seqs.qzv")
+        sequence_tabulated = os.path.join(self.out_dir, "merged_dada2_rep_seqs.qzv")
 
         return luigi.LocalTarget(sequence_tabulated)
 
@@ -1876,7 +1875,7 @@ class Sequence_Tabulate(luigi.Task):
         # Make output directory
         run_cmd(["mkdir",
                 "-p",
-                self.merged_dir],
+                self.out_dir],
                 self)
 
         # Run qiime metadata tabulate
@@ -1968,7 +1967,7 @@ class Rarefaction_Curves(luigi.Task):
         run_cmd(cmd, self)
 
 class Alpha_Group_Significance(luigi.Task):
-    out_dir = Output_Dirs().alpha_sig_dir
+    out_dir = Output_Dirs().analysis_dir
     metadata_file = Samples().metadata_file
 
     def requires(self):
@@ -2030,20 +2029,20 @@ class Alpha_Group_Significance(luigi.Task):
             run_cmd(cmd, self)
 
 class PCoA_Plots(luigi.Task):
-    pcoa_dir = Output_Dirs().pcoa_dir
+    out_dir = Output_Dirs().pcoa_dir
     metadata_file = Samples().metadata_file
 
     def requires(self):
         return Core_Metrics_Phylogeny()
 
     def output(self):
-        unweighted_unifrac_pcoa = os.path.join(self.pcoa_dir,
+        unweighted_unifrac_pcoa = os.path.join(self.out_dir,
                 "unweighted_unifrac_pcoa_plots.pdf")
-        weighted_unifrac_pcoa = os.path.join(self.pcoa_dir,
+        weighted_unifrac_pcoa = os.path.join(self.out_dir,
                 "weighted_unifrac_pcoa_plots.pdf")
-        bray_curtis_pcoa = os.path.join(self.pcoa_dir,
+        bray_curtis_pcoa = os.path.join(self.out_dir,
                 "bray_curtis_pcoa_plots.pdf")
-        jaccard_pcoa = os.path.join(self.pcoa_dir,
+        jaccard_pcoa = os.path.join(self.out_dir,
                 "jaccard_pcoa_plots.pdf")
 
         output = {
@@ -2070,7 +2069,7 @@ class PCoA_Plots(luigi.Task):
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                self.pcoa_dir],
+                self.out_dir],
                 self)
 
         # Input PCoA artifacts to loop through
@@ -2090,13 +2089,13 @@ class PCoA_Plots(luigi.Task):
                         outdir)
 
 class PCoA_Plots_jpeg(luigi.Task):
-    pcoa_dir = Output_Dirs().pcoa_dir
+    out_dir = Output_Dirs().pcoa_dir
     metadata_file = Samples().metadata_file
 
-    unweighted_unifrac_dir = os.path.join(pcoa_dir, "unweighted_unifrac")
-    weighted_unifrac_dir = os.path.join(pcoa_dir, "weighted_unifrac")
-    bray_curtis_dir = os.path.join(pcoa_dir, "bray_curtis")
-    jaccard_dir = os.path.join(pcoa_dir, "jaccard")
+    unweighted_unifrac_dir = os.path.join(out_dir, "unweighted_unifrac")
+    weighted_unifrac_dir = os.path.join(out_dir, "weighted_unifrac")
+    bray_curtis_dir = os.path.join(out_dir, "bray_curtis")
+    jaccard_dir = os.path.join(out_dir, "jaccard")
 
     def requires(self):
         return Core_Metrics_Phylogeny()
@@ -2110,7 +2109,7 @@ class PCoA_Plots_jpeg(luigi.Task):
                 "bray_curtis_pcoa_plots.done")
         jaccard_pcoa = os.path.join(self.jaccard_dir,
                 "jaccard_pcoa_plots.done")
-        json_summary = os.path.join(self.pcoa_dir,
+        json_summary = os.path.join(self.out_dir,
                 "pcoa_columns.json")
 
         output = {
@@ -2138,7 +2137,7 @@ class PCoA_Plots_jpeg(luigi.Task):
         # Make output directory
         run_cmd(['mkdir',
                 '-p',
-                self.pcoa_dir],
+                self.out_dir],
                 self)
 
         # Input PCoA artifacts to loop through
@@ -2193,19 +2192,6 @@ class Get_Version_Info(luigi.Task):
             fh.write('Taxonomic Classifier path\n')
             fh.write(classifier_path)
 
-# Dummy class to run Denoise tasks
-class Run_Denoise_Tasks(luigi.Task):
-
-    def requires(self):
-        return [
-            Denoise(),
-            Merge_Denoise(),
-            Merge_Denoise_Stats(),
-            Sample_Count_Summary(),
-            Denoise_Tabulate(),
-            Merge_Denoise_Tabulate()
-        ]
-
 # Dummy Class to run multiple tasks
 class Core_Analysis(luigi.Task):
     out_dir = Output_Dirs().out_dir
@@ -2243,6 +2229,29 @@ class Post_Analysis(luigi.Task):
                 Get_Version_Info()
         ]
 
+# Dummy class to run Input Upload tasks
+class Run_Input_Upload_Tasks(luigi.Task):
+
+    def requires(self):
+        return [
+            Import_Data(),
+            Summarize(),
+        ]
+
+# Dummy class to run Denoise tasks
+class Run_Denoise_Tasks(luigi.Task):
+
+    def requires(self):
+        return [
+            Denoise(),
+            Merge_Denoise(),
+            Merge_Denoise_Stats(),
+            Sample_Count_Summary(),
+            Denoise_Tabulate(),
+            Merge_Denoise_Tabulate(),
+            Get_Version_Info(),
+        ]
+
 class TaxonomicClassification_Module(luigi.Task):
     """
     Run all the steps involved in the 'Taxonomic Classification module'
@@ -2255,6 +2264,7 @@ class TaxonomicClassification_Module(luigi.Task):
             Taxonomic_Classification(),
             Taxa_Collapse(),
             Export_Taxa_Collapse(),
+            Get_Version_Info(),
         ]
 
 class Analysis_Module(luigi.Task):
@@ -2273,6 +2283,7 @@ class Analysis_Module(luigi.Task):
             Filter_Feature_Table(),
             Core_Metrics_Phylogeny(),
             PCoA_Plots(),
+            Get_Version_Info(),
         ]
 
 if __name__ == '__main__':
