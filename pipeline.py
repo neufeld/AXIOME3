@@ -2236,6 +2236,7 @@ class Run_Input_Upload_Tasks(luigi.Task):
         return [
             Import_Data(),
             Summarize(),
+            Get_Version_Info()
         ]
 
 # Dummy class to run Denoise tasks
