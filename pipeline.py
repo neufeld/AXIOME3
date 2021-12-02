@@ -2206,7 +2206,7 @@ class Core_Analysis(luigi.Task):
                 Sequence_Tabulate(),
                 Taxonomy_Tabulate(),
                 Export_Taxa_Collapse(),
-                Get_Version_Info()
+                Get_Version_Info(),
                 ]
 
     def output(self):
@@ -2236,6 +2236,7 @@ class Run_Input_Upload_Tasks(luigi.Task):
         return [
             Import_Data(),
             Summarize(),
+            Get_Version_Info()
         ]
 
 # Dummy class to run Denoise tasks
@@ -2262,6 +2263,7 @@ class TaxonomicClassification_Module(luigi.Task):
     def requires(self):
         return [
             Taxonomic_Classification(),
+            Export_Taxonomy(),
             Taxa_Collapse(),
             Export_Taxa_Collapse(),
             Get_Version_Info(),

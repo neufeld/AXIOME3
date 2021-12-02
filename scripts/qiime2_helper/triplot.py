@@ -533,7 +533,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			data=wascores_df,
 			stroke=stroke,
 			inherit_aes=False,
-			show_legend=False
+			show_legend=True
 		)
 
 		# Taxa annotation
@@ -555,7 +555,7 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			taxa_max_size = point_size * 3
 		else:
 			taxa_max_size = point_size * 1.5
-		plot = plot + taxa_points + scale_size_area(max_size=taxa_max_size) + taxa_anno
+		plot = plot + taxa_points + scale_size_area(max_size=taxa_max_size, breaks=[0.1, 0.2, 0.5], labels=['0.1', '0.2', '0.5']) + taxa_anno
 
 	# if vector arrows pass the thresohld
 	if(vector_arrow_df.shape[0] > 0):
@@ -604,10 +604,10 @@ def save_plot(plot, filename, output_dir='.',
 		units=units
 	)
 
-#feature_table_artifact_path = "/data/merged_table.qza"
-#taxonomy_artifact_path = "/data/taxonomy.qza"
-#sample_metadata_path = "/data/metadata_MaCoTe.tsv"
-#env_metadata_path = "/data/environmental_metadata.tsv"
+#feature_table_artifact_path = "/output/test/merged_table.qza"
+#taxonomy_artifact_path = "/output/test/taxonomy.qza"
+#sample_metadata_path = "/output/test/metadata.tsv"
+#env_metadata_path = "/output/test/environmental_metadata.tsv"
 #
 #merged_df, vector_arrow_df, wascores_df, proportion_explained, projection_df, sample_summary = prep_triplot_input(
 #	sample_metadata_path,
@@ -617,7 +617,7 @@ def save_plot(plot, filename, output_dir='.',
 #	sampling_depth=6000,
 #	ordination_collapse_level="asv",
 #	wascores_collapse_level="phylum",
-#	wa_threshold=0.51,
+#	wa_threshold=0.05,
 #	R2_threshold=0.05,
 #	pval_threshold=0.5,
 #	PC_axis_one=1,
@@ -628,9 +628,9 @@ def save_plot(plot, filename, output_dir='.',
 #	vector_arrow_df,
 #	wascores_df,
 #	proportion_explained,
-#	fill_variable="NTCGroup",
+#	fill_variable="Group1",
 #	fill_variable_dtype="category",
 #	PC_axis_one=1,
 #	PC_axis_two=2
 #)
-#save_plot(triplot, "plot")
+#save_plot(triplot, "plot", '/output/test')
