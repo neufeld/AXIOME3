@@ -2253,7 +2253,7 @@ class Run_Denoise_Tasks(luigi.Task):
             Get_Version_Info(),
         ]
 
-class TaxonomicClassification_Module(luigi.Task):
+class Run_TaxonomicClassification_Tasks(luigi.Task):
     """
     Run all the steps involved in the 'Taxonomic Classification module'
 
@@ -2269,7 +2269,7 @@ class TaxonomicClassification_Module(luigi.Task):
             Get_Version_Info(),
         ]
 
-class Analysis_Module(luigi.Task):
+class Run_Analysis_Tasks(luigi.Task):
     """
     Run all the steps involved in the 'Analysis module'
 
@@ -2285,6 +2285,7 @@ class Analysis_Module(luigi.Task):
             Filter_Feature_Table(),
             Core_Metrics_Phylogeny(),
             PCoA_Plots(),
+            PCoA_Plots_jpeg(),
             Get_Version_Info(),
         ]
 
