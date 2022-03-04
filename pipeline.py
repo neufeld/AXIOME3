@@ -2101,28 +2101,10 @@ class PCoA_Plots_jpeg(luigi.Task):
         return Core_Metrics_Phylogeny()
 
     def output(self):
-        unweighted_unifrac_pcoa = os.path.join(self.unweighted_unifrac_dir,
-                "unweighted_unifrac_pcoa_plots.done")
-        weighted_unifrac_pcoa = os.path.join(self.weighted_unifrac_dir,
-                "weighted_unifrac_pcoa_plots.done")
-        bray_curtis_pcoa = os.path.join(self.bray_curtis_dir,
-                "bray_curtis_pcoa_plots.done")
-        jaccard_pcoa = os.path.join(self.jaccard_dir,
-                "jaccard_pcoa_plots.done")
         json_summary = os.path.join(self.out_dir,
                 "pcoa_columns.json")
 
-        output = {
-                'unweighted_unifrac_pcoa':
-                luigi.LocalTarget(unweighted_unifrac_pcoa),
-                'weighted_unifrac_pcoa':
-                luigi.LocalTarget(weighted_unifrac_pcoa),
-                'bray_curtis_pcoa': luigi.LocalTarget(bray_curtis_pcoa),
-                'jaccard_pcoa': luigi.LocalTarget(jaccard_pcoa),
-                'json': luigi.LocalTarget(json_summary)
-                }
-
-        return output
+        return luigi.LocalTarget(json_summary)
 
     def run(self):
         # Make sure Metadata file is provided and exists
@@ -2142,12 +2124,16 @@ class PCoA_Plots_jpeg(luigi.Task):
 
         # Input PCoA artifacts to loop through
         # (It's identical to output keys!)
-        metrics = ['unweighted_unifrac_pcoa', 'weighted_unifrac_pcoa',
-                'jaccard_pcoa', 'bray_curtis_pcoa']
+        metrics_outdir_map = {
+            'unweighted_unifrac_pcoa': self.unweighted_unifrac_dir,
+            'weighted_unifrac_pcoa': self.weighted_unifrac_dir,
+            'jaccard_pcoa': self.jaccard_dir,
+            'bray_curtis_pcoa': self.bray_curtis_dir,
+        }
 
         # Make PCoA plots for each distance metric
-        for metric in metrics:
-            outdir = os.path.dirname(self.output()[metric].path)
+        for metric in metrics_outdir_map:
+            outdir = metrics_outdir_map[metric]
 
             # Make sub-output directory
             run_cmd(['mkdir',
@@ -2161,7 +2147,7 @@ class PCoA_Plots_jpeg(luigi.Task):
                     outdir
             )
 
-        save_as_json(self.metadata_file, self.output()['json'].path)
+        save_as_json(self.metadata_file, self.output().path)
 
 # Get software version info
 class Get_Version_Info(luigi.Task):
