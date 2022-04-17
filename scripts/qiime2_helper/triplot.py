@@ -1,6 +1,8 @@
+from typing import List, Union
+
 import os
 import subprocess
-from math import floor
+import math
 from textwrap import dedent
 import pandas as pd
 import numpy as np
@@ -343,6 +345,48 @@ def get_variance_explained(eig_vals):
 	
 	return proportion_explained
 
+
+def calculate_vector_magnitude_df(df: pd.DataFrame, col1: str, col2: str):
+	"""Given df with coordinate columns col1 and col2, calculate magnitude"""
+	for col in [col1, col2]:
+		if col not in df.columns:
+			raise AXIOME3Error(f"{col} not present in the df!")
+
+	df['magnitude'] = np.sqrt(df[col1] ** 2 + df[col2] ** 2)
+
+	return df
+
+
+def get_axis_breakpoints(
+	low: Union[int, float], high: Union[int, float], num_breaks: int = 3
+) -> List[Union[int, float]]:
+	"""Given df, calculate breakpoints using min, max, mean and corresponding labels."""
+	if(num_breaks < 2):
+		raise ValueError("There has to be at least two breaks")
+
+	breakpoints = [round(x, 2) for x in np.linspace(low, high, num=num_breaks, endpoint=True)]
+
+	return breakpoints, [str(x) for x in breakpoints]
+
+
+
+def normalize_env_arrow_against_pcoa(pcoa_df: pd.DataFrame, env_arrow_df: pd.DataFrame, pc1_col: str, pc2_col: str):
+	pcoa_magnitude = calculate_vector_magnitude_df(pcoa_df, pc1_col, pc2_col)
+	max_pcoa_magnitude = pcoa_magnitude['magnitude'].max()
+
+	env_arrow_magnitude = calculate_vector_magnitude_df(env_arrow_df, pc1_col, pc2_col)
+	
+	env_arrow_magnitude.apply(
+		lambda x: x[pc1_col] * (max_pcoa_magnitude / x['magnitude']) if x['magnitude'] > max_pcoa_magnitude else x[pc1_col]
+	)
+
+	env_arrow_magnitude.apply(
+		lambda x: x[pc2_col] * (max_pcoa_magnitude / x['magnitude']) if x['magnitude'] > max_pcoa_magnitude else x[pc2_col]
+	)
+
+	return env_arrow_magnitude
+
+
 def prep_triplot_input(sample_metadata_path, env_metadata_path, feature_table_artifact_path,
 	taxonomy_artifact_path, sampling_depth=0, ordination_collapse_level="asv", 
 	wascores_collapse_level="phylum", dissmilarity_index="Bray-Curtis", R2_threshold=0.1, 
@@ -555,7 +599,16 @@ def make_triplot(merged_df, vector_arrow_df, wascores_df, proportion_explained,
 			taxa_max_size = point_size * 3
 		else:
 			taxa_max_size = point_size * 1.5
-		plot = plot + taxa_points + scale_size_area(max_size=taxa_max_size, breaks=[0.1, 0.2, 0.5], labels=['0.1', '0.2', '0.5']) + taxa_anno
+
+		breakpoints, labels = get_axis_breakpoints(
+			wascores_df["abundance"].min(), wascores_df["abundance"].max(), 4
+		)
+		plot = plot + taxa_points + scale_size_area(
+			max_size=taxa_max_size,
+			breaks=breakpoints,
+			labels=labels,
+		) + taxa_anno
+		#plot = plot + taxa_points + scale_size_area(max_size=taxa_max_size,) + taxa_anno
 
 	# if vector arrows pass the thresohld
 	if(vector_arrow_df.shape[0] > 0):
